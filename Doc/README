@@ -1,0 +1,8 @@
+PyCraft is a high quality Minecraft world editor in Python. Even though main
+objective of this package is to be Python 3.x compliant, it is written to ease
+backward portability with Python 2.7 language specifications.
+
+Minecraft is a multiplayer sandbox game. More information can be found at
+their official site: http://www.minecraft.net
+
+Currently, PyCraft only allows *offline* world editing.
