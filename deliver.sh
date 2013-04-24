@@ -96,5 +96,5 @@ git add dist/PyCraft-${TAG}.tar.bz2
 git commit -q -m "${COMMIT_MSG}"
 git tag ${TAG}
 
-rm README setup.py
+rm MANIFEST README setup.py
 echo "done."
