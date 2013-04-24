@@ -40,4 +40,4 @@ for better performance
 """
 
 __all__ = ('low', 'nbt', 'anvil',
-           'geometry')
+           'entity', 'geometry')
