@@ -1,6 +1,7 @@
 2013-05-24  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
 	* low.py multiple successive reads or writes are now allowed
+	* geometry.py add a named tuple to manage 3-D coordinates
 
 2013-04-09  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
