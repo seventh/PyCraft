@@ -1,0 +1,3 @@
+* As io.IOBase.truncate() behaviour under windows is unpredictable when
+  extending a file (http://docs.python.org/3/library/io.html#io.IOBase),
+  always prefer io.RawIOBase.write(b"\x00" * extension_size)

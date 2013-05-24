@@ -1,3 +1,7 @@
+2014-03-23  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
+
+	* region.py first proposal of handling Region formatted files.
+
 2014-03-07  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
 	* con.py added support for slices, and now compatible with Python2
