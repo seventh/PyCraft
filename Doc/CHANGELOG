@@ -1,4 +1,7 @@
+2013-05-24  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
+
+	* low.py multiple successive reads or writes are now allowed
+
 2013-04-09  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
-	* NBT file format editors
-
+	* nbt.py NBT file format editors
