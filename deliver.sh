@@ -60,7 +60,7 @@ if __name__ == "__main__":
     setup(
         name = "PyCraft",
         version = "<VERSION>",
-        license = "GPLv3",
+        license = "CeCILL-C",
         description = "High quality Minecraft world editor",
         author = "Guillaume Lemaître",
         author_email = "guillaume.lemaitre@gmail.com",
@@ -71,17 +71,19 @@ if __name__ == "__main__":
             ("/usr/share/doc/pycraft", [
                     "Doc/AUTHORS",
                     "Doc/CHANGELOG",
-                    "Doc/COPYING",
-                    "README",
+                    "Doc/Licence_CeCILL-C_V1-en.txt",
+                    "Doc/Licence_CeCILL-C_V1-fr.txt",
+                    "README.rst",
                     ]),
             ],
         classifiers = [
             "Development Status :: 2 - Pre-Alpha",
             "Intended Audience :: Developers",
-            "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+            "License :: OSI Approved",
             "Natural Language :: English",
             "Operating System :: OS Independent",
             "Programming Language :: Python",
+            "Topic :: Games/Entertainment",
             ],
         keywords = ["Minecraft"],
 
@@ -89,7 +91,7 @@ if __name__ == "__main__":
 EOF
 sed -i -e 's,<VERSION>,'${TAG}',' setup.py
 
-ln Doc/README .
+ln README.rst README
 
 python3 setup.py sdist --format=bztar || fail "invalid configuration"
 git add dist/PyCraft-${TAG}.tar.bz2

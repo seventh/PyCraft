@@ -2,21 +2,19 @@
 """
 
 import unittest
-from pycraft import nbt
+from pycraft import con
 
 
 class BigTest(unittest.TestCase):
 
     def test_complete(self):
-        R = nbt.Reader()
         with open("bigtest.nbt", "rb") as input_file:
             with open("bigtest.out", "wb") as output_file:
-                D = R.read(input_file)
-                F = R.last_format
+                (K, N, V) = con.Reader.load(input_file)
 
-                #print(F.pretty(D))
+                #print(V.pretty(N))
 
-                nbt.write(output_file, D, F)
+                con.Writer.save(output_file, K, N, V)
 
             input_file.seek(0, 0)
             with open("bigtest.out", "rb") as output_file:
