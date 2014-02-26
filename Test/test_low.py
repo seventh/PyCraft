@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Check low-level binary readers/writers
 """
 

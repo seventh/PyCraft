@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Copyright or © or Copr. Guillaume Lemaître (2013)
 #
 #   guillaume.lemaitre@gmail.com

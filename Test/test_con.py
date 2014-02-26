@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Check that reading and writing the classic 'bigtest.nbt' file is OK
 """
 
@@ -9,11 +11,10 @@ class BigTest(unittest.TestCase):
 
     def test_complete(self):
         with open("bigtest.nbt", "rb") as input_file:
+            (K, N, V) = con.Reader.load(input_file)
+            #print(V.pretty(N))
+
             with open("bigtest.out", "wb") as output_file:
-                (K, N, V) = con.Reader.load(input_file)
-
-                #print(V.pretty(N))
-
                 con.Writer.save(output_file, K, N, V)
 
             input_file.seek(0, 0)

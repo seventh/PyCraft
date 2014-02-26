@@ -82,7 +82,7 @@ if __name__ == "__main__":
             "License :: OSI Approved",
             "Natural Language :: English",
             "Operating System :: OS Independent",
-            "Programming Language :: Python",
+            "Programming Language :: Python :: 3",
             "Topic :: Games/Entertainment",
             ],
         keywords = ["Minecraft"],
@@ -98,5 +98,5 @@ git add dist/PyCraft-${TAG}.tar.bz2
 git commit -q -m "${COMMIT_MSG}"
 git tag ${TAG}
 
-rm MANIFEST README setup.py
+rm MANIFEST README
 echo "done."

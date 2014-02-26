@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Copyright or © or Copr. Guillaume Lemaître (2014)
 #
 #   guillaume.lemaitre@gmail.com
@@ -336,15 +338,10 @@ class Reader(object):
     """
 
     @staticmethod
-    def load(entry):
+    def load(flow):
         """Read (kind, name, value) triple from binary flow
         """
         result = None # (kind, name, value)
-
-        if type(entry) == type(str()):
-            flow = gzip.open(entry, "rb")
-        else:
-            flow = entry
 
         kind = low.read_byte(flow)
         if kind != _TAG_NONE:
@@ -356,8 +353,19 @@ class Reader(object):
                 kind = TAG_LIST
             result = (kind, name, value)
 
-        if type(entry) == type(str()):
-            flow.close()
+        return result
+
+
+    @staticmethod
+    def load_file(path):
+        """Read (kind, name, value) triple from NBT-formatted file identified
+        by given path
+        """
+        result = None # (kind, name, value)
+
+        flow = gzip.open(path, "rb")
+        result = Reader.load(flow)
+        flow.close()
 
         return result
 
@@ -636,12 +644,21 @@ class List(Container, collections.MutableSequence):
         Writer.save(flow, TAG_LIST, "", self)
 
 
-def load(flow):
-    """Read NBT value from flow
+def load(entry):
+    """Read NBT value from entry, being it a pathname identifying a file or a
+    binary flow
 
-    See Reader.load in order to also access name and kind of the read value.
+    See Reader.load and Reader.load_file in order to also access name and
+    kind of the read value.
     """
-    return Reader.load(flow)[2]
+    content = None
+
+    if type(entry) == type(str):
+        content = Reader.load_file(entry)
+    else:
+        content = Reader.load(entry)
+
+    return content[2]
 
 
 save = Writer.save

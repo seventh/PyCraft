@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Check the behavior of entity wrappers
 """
 
