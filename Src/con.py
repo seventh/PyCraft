@@ -111,86 +111,13 @@ def is_accepted(kind, value):
         result = isinstance(value, str)
 
     elif kind == TAG_LIST:
-        result = isinstance(value, List)
+        result = isinstance(value, (list, List))
 
     elif kind == TAG_COMPOUND:
-        result = isinstance(value, Dict)
+        result = isinstance(value, (dict, Dict))
 
     else:
         raise ValueError("Unknown kind {}".format(kind))
-
-    return result
-
-
-def default_value(kind):
-    """Default value for any instance of the corresponding kind
-    """
-    result = None
-
-    if kind in (TAG_BYTE,
-                TAG_SHORT,
-                TAG_INT,
-                TAG_LONG):
-        result = int()
-
-    elif kind in (TAG_FLOAT,
-                  TAG_DOUBLE):
-        result = float()
-
-    elif kind == TAG_STRING:
-        result = str()
-
-    elif kind == TAG_COMPOUND:
-        result = Dict()
-
-    elif kind == TAG_LIST:
-        result = List()
-
-    return result
-
-
-def default_kind(value):
-    """When no precision is given, the largest one is preferred
-    """
-    result = None
-
-    if isinstance(value, int):
-        result = TAG_LONG
-    elif isinstance(value, float):
-        result = TAG_DOUBLE
-    elif isinstance(value, str):
-        result = TAG_STRING
-    elif isinstance(value, list, List):
-        result = TAG_LIST
-    elif isinstance(value, dict, Dict):
-        result = TAG_COMPOUND
-
-    return result
-
-
-def convert(value):
-    """Convert a plain dict/list container into a NBT equivalent one
-    """
-    result = None
-
-    if isinstance(value, int):
-        result = (TAG_LONG, value)
-    elif isinstance(value, float):
-        result = (TAG_DOUBLE, value)
-    elif isinstance(value, str):
-        result = (TAG_STRING, value)
-    elif isinstance(value, List):
-        result = (TAG_LIST, value)
-    elif isinstance(value, Dict):
-        result = (TAG_COMPOUND, value)
-    elif isinstance(value, list):
-        result = (TAG_LIST, List())
-        for elem in value:
-            result[1].append(convert(elem)[1])
-    elif isinstance(value, dict):
-        result = (TAG_COMPOUND, Dict())
-        for key in value:
-            result[1][key] = convert(value[key])[1]
 
     return result
 
@@ -218,23 +145,145 @@ def tag_name(kind):
     return result
 
 
-def pretty(value, kind = None, name = "", level = 0):
+def pretty(value, kind = None, name = None, level = 0):
+    def_kind, value = Oracle.suit(value)
+
     if kind is None:
-        if isinstance(value, Dict, List):
-            return value.pretty(name, level)
-        else:
-            raise ValueError("Values should be explicitely typed")
+        pretty(value, def_kind, name, level)
 
     elif kind in (TAG_COMPOUND, TAG_LIST):
         return value.pretty(name, level)
-
     elif kind == TAG_STRING:
-        return "{: >{fill}}{}({}): {}".format("", tag_name(kind), repr(name), repr(value), fill = level * 2)
+        if name is None:
+            return "{: >{fill}}{}: {}".format("", tag_name(kind), repr(value), fill = level * 2)
+        else:
+            return "{: >{fill}}{}({}): {}".format("", tag_name(kind), repr(name), repr(value), fill = level * 2)
     elif kind in [TAG_BYTE, TAG_SHORT, TAG_INT, TAG_LONG, TAG_FLOAT, TAG_DOUBLE]:
-        return "{: >{fill}}{}({}): {}".format("", tag_name(kind), repr(name), value, fill = level * 2)
+        if name is None:
+            return "{: >{fill}}{}: {}".format("", tag_name(kind), value, fill = level * 2)
+        else:
+            return "{: >{fill}}{}({}): {}".format("", tag_name(kind), repr(name), value, fill = level * 2)
 
     else:
         raise ValueError
+
+
+class Oracle(object):
+    """Utility class to transform any data into a pycraft one.
+    The proposed transformation follows this schema:
+
+    isinstance(value, int)          --> result = (TAG_LONG, value)
+    isinstance(value, float)        --> result = (TAG_DOUBLE, value)
+    isinstance(value, str)          --> result = (TAG_STRING, value)
+    isinstance(value, (list, List)) --> result = (TAG_LIST, List(value))
+    isinstance(value, (dict, Dict)) --> result = (TAG_COMPOUND, Dict(value))
+    """
+
+    @staticmethod
+    def suit(value):
+        """Recursively create a pycraft compliant data from input value.
+        Result is a (kind, value) pair
+        """
+        result = None
+
+        if isinstance(value, (int, float, str)):
+            result = (Oracle.default_kind(value), value)
+        elif isinstance(value, (list, List)):
+            result = (TAG_LIST, List())
+            if isinstance(value, List):
+                result[1].set_kind(value.get_kind())
+            for elem in value:
+                result[1].append(Oracle.suit(elem)[1])
+        elif isinstance(value, (dict, Dict)):
+            result = (TAG_COMPOUND, Dict())
+            if isinstance(value, Dict):
+                for key in value:
+                    result[1].set_kind(key, value.get_kind(key))
+                    result[1][key] = Oracle.suit(value[key])[1]
+            else:
+                for key in value:
+                    result[1][key] = Oracle.suit(value[key])[1]
+
+        return result
+
+
+    @staticmethod
+    def test(value):
+        """Recursively verify that value complies to both its explicit
+        constraints and implicit constraints induced by the NBT format
+        """
+        result = True
+
+        if isinstance(value, (int, float, str)):
+            result = is_accepted(Oracle.default_kind(value), value)
+        elif isinstance(value, list):
+            kind = None
+            for elem in value:
+                if kind is None:
+                    kind = Oracle.default_kind(elem)
+                    if not Oracle.test(elem):
+                        result = False
+                        break
+                elif kind != Oracle.default_kind(elem) or not Oracle.test(elem):
+                    result = False
+                    break
+        elif isinstance(value, dict):
+            for elem in value.items():
+                if not is_accepted(Oracle.default_kind(elem), elem) \
+                        or not Oracle.test(elem):
+                    result = False
+                    break
+
+        return result
+
+
+    @staticmethod
+    def default_value(kind):
+        """Default value for any instance of the corresponding kind
+        """
+        result = None
+
+        if kind in (TAG_BYTE,
+                    TAG_SHORT,
+                    TAG_INT,
+                    TAG_LONG):
+            result = int()
+
+        elif kind in (TAG_FLOAT,
+                      TAG_DOUBLE):
+            result = float()
+
+        elif kind == TAG_STRING:
+            result = str()
+
+        elif kind == TAG_COMPOUND:
+            result = Dict()
+
+        elif kind == TAG_LIST:
+            result = List()
+
+        return result
+
+
+    @staticmethod
+    def default_kind(value):
+        """When no precision is given, the largest suitable kind is preferred
+        """
+        result = None
+
+        if isinstance(value, int):
+            result = TAG_LONG
+        elif isinstance(value, float):
+            result = TAG_DOUBLE
+        elif isinstance(value, str):
+            result = TAG_STRING
+        elif isinstance(value, (list, List)):
+            result = TAG_LIST
+        elif isinstance(value, (dict, Dict)):
+            result = TAG_COMPOUND
+
+        return result
+
 
 
 class Writer(object):
@@ -251,6 +300,20 @@ class Writer(object):
     def save(entry, kind, name, value):
         """Record (name, value) pair, considering value's kind, into binary
         flow
+        """
+        # First, convert provided value, in case of mixing of native and
+        # specific containers
+        converted_value = Oracle.suit(value)
+
+        # Then, actually save
+        Writer._save(entry, kind, name, converted_value[1])
+
+
+    @staticmethod
+    def _save(entry, kind, name, value):
+        """Record (name, value) pair, considering value's kind, into binary
+        flow. Value is supposed to be a combination of int/float/str/Dict/List
+        only
         """
         # Refine kind for a list
         if kind == TAG_LIST:
@@ -276,20 +339,24 @@ class Writer(object):
     @staticmethod
     def _save_dict(flow, value):
         for key in value:
-            Writer.save(flow, value.get_kind(key), key, value[key])
+            Writer._save(flow, value.get_kind(key), key, value[key])
         low.write_byte(flow, _TAG_NONE)
 
 
     @staticmethod
     def _save_list(flow, value):
-        # Refine elements kind in case of a list of lists
+        # Refine elements kind in case of an empty list or a list of lists
         inner_kind = value.get_kind()
-        if inner_kind == TAG_LIST:
+        if inner_kind is None:
+            inner_kind = _TAG_NONE
+        elif inner_kind == TAG_LIST:
+            at_least_one = False
             byte_only = True
             int_only = True
             for inner_v in value:
                 inner_inner_kind = inner_v.get_kind()
                 if inner_inner_kind is not None:
+                    at_least_one = True
                     if inner_inner_kind == TAG_BYTE:
                         int_only = False
                     elif inner_inner_kind == TAG_INT:
@@ -303,10 +370,11 @@ class Writer(object):
 
             # In case of deuce (all inner lists are empty), always consider
             # inner lists to be byte arrays
-            if byte_only:
-                inner_kind = _TAG_BYTE_ARRAY
-            elif int_only:
-                inner_kind = _TAG_INT_ARRAY
+            if at_least_one:
+                if byte_only:
+                    inner_kind = _TAG_BYTE_ARRAY
+                elif int_only:
+                    inner_kind = _TAG_INT_ARRAY
 
         # Write elements kind, then elements count, then elements values
         low.write_byte(flow, inner_kind)
@@ -394,7 +462,9 @@ class Reader(object):
 
         reader = Reader.readers[kind]
 
-        if kind in [_TAG_BYTE_ARRAY, _TAG_INT_ARRAY]:
+        if kind == _TAG_NONE:
+            kind = None
+        elif kind in [_TAG_BYTE_ARRAY, _TAG_INT_ARRAY]:
             kind = TAG_LIST
         result.set_kind(kind)
 
@@ -406,7 +476,7 @@ class Reader(object):
 
     @staticmethod
     def _load_list_byte(flow):
-        result = convert(low.read_byte_array(flow))[1]
+        result = List(low.read_byte_array(flow))
         result.set_kind(TAG_BYTE)
 
         return result
@@ -414,7 +484,7 @@ class Reader(object):
 
     @staticmethod
     def _load_list_int(flow):
-        result = convert(low.read_int_array(flow))[1]
+        result = List(low.read_int_array(flow))
         result.set_kind(TAG_INT)
 
         return result
@@ -443,6 +513,10 @@ _DictPair = collections.namedtuple('_DictPair', ['kind', 'item'])
 class Container(object):
     """Abstract base class of containers
     """
+
+    def __repr__(self):
+        return self.pretty()
+
 
     def pretty(self, name = "", level = 0):
         raise NotImplementedError
@@ -486,13 +560,12 @@ class Dict(Container, collections.MutableMapping):
     def __setitem__(self, key, value):
         if key in self:
             kind = self._pairs[key].kind
+            if not is_accepted(kind, value):
+                raise ValueError
         else:
-            kind, value = convert(value)
+            kind = Oracle.default_kind(value)
 
-        if not is_accepted(kind, value):
-            raise ValueError
-        else:
-            self._pairs[key] = _DictPair(kind, value)
+        self._pairs[key] = _DictPair(kind, value)
 
 
     def __iter__(self):
@@ -501,10 +574,6 @@ class Dict(Container, collections.MutableMapping):
 
     def __len__(self):
         return len(self._pairs)
-
-
-    def __repr__(self):
-        return self.pretty()
 
 
     def get_kind(self, key):
@@ -530,11 +599,14 @@ class Dict(Container, collections.MutableMapping):
             else:
                 self._pairs[key] = _DictPair(kind, pair.item)
         else:
-            self._pairs[key] = _DictPair(kind, default_value(kind))
+            self._pairs[key] = _DictPair(kind, Oracle.default_value(kind))
 
 
-    def pretty(self, name = "", level = 0):
-        result = "{: >{fill}}TAG_Compound({}): {{\n".format("", repr(name), fill = 2 * level)
+    def pretty(self, name = None, level = 0):
+        if name is None:
+            result = "{: >{fill}}TAG_Compound: {{\n".format("", fill = 2 * level)
+        else:
+            result = "{: >{fill}}TAG_Compound({}): {{\n".format("", repr(name), fill = 2 * level)
 
         for key in self._pairs:
             result += pretty(self._pairs[key].item, self._pairs[key].kind, key, level + 1)
@@ -557,9 +629,13 @@ class List(Container, collections.MutableSequence):
     __slots__ = ('_kind', '_items')
 
 
-    def __init__(self):
+    def __init__(self, other = None):
         self._kind = None
         self._items = list()
+
+        if other is not None:
+            assert Oracle.test(other)
+            self[:] = other[:]
 
 
     def __delitem__(self, key):
@@ -572,7 +648,7 @@ class List(Container, collections.MutableSequence):
 
     def __setitem__(self, key, value):
         if self._kind is None:
-            self._kind = default_kind(value)
+            self._kind = Oracle.default_kind(value)
 
         if self._kind is None:
             raise KeyError
@@ -597,7 +673,7 @@ class List(Container, collections.MutableSequence):
 
     def insert(self, key, value):
         if self._kind is None:
-            self._kind = default_kind(value)
+            self._kind = Oracle.default_kind(value)
 
         if self._kind is None:
             raise KeyError
@@ -622,8 +698,11 @@ class List(Container, collections.MutableSequence):
                 self._kind = kind
 
 
-    def pretty(self, name = "", level = 0):
-        result = "{: >{fill}}TAG_List({}) of {}: ".format("", repr(name), tag_name(self._kind), fill = 2 * level)
+    def pretty(self, name = None, level = 0):
+        if name is None:
+            result = "{: >{fill}}TAG_List of {}: ".format("", tag_name(self._kind), fill = 2 * level)
+        else:
+            result = "{: >{fill}}TAG_List({}) of {}: ".format("", repr(name), tag_name(self._kind), fill = 2 * level)
 
         if self._kind not in (TAG_LIST, TAG_COMPOUND):
             result += "[" + ", ".join(map(str, self._items)) + "]\n"
@@ -644,6 +723,7 @@ class List(Container, collections.MutableSequence):
         Writer.save(flow, TAG_LIST, "", self)
 
 
+
 def load(entry):
     """Read NBT value from entry, being it a pathname identifying a file or a
     binary flow
@@ -653,7 +733,7 @@ def load(entry):
     """
     content = None
 
-    if type(entry) == type(str):
+    if isinstance(entry, str):
         content = Reader.load_file(entry)
     else:
         content = Reader.load(entry)
@@ -662,38 +742,5 @@ def load(entry):
 
 
 save = Writer.save
-
-
-if __name__ == "__main__":
-    D = Dict()
-
-    D["a"] = 15
-    D.set_kind("a", TAG_BYTE)
-
-    D.set_kind("b", TAG_COMPOUND)
-    print(D)
-
-    D.set_kind("c", TAG_LIST)
-    D["c"].append(5)
-    D["c"].append(7)
-    D["c"].append(6)
-    D["c"].set_kind(TAG_SHORT)
-    print(D)
-
-    D["d"] = List()
-    D["d"].set_kind(TAG_LIST)
-    D["d"].append(List())
-    D["d"][0].set_kind(TAG_INT)
-    D["d"].append(List())
-    D["d"][1].set_kind(TAG_INT)
-    print(D)
-
-    import io
-    BUFFER = io.BytesIO()
-    D.save(BUFFER)
-
-    BUFFER.seek(0)
-    F = load(BUFFER)
-    print(F)
-
-    print(D == F)
+suit = Oracle.suit
+test = Oracle.test
