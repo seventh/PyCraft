@@ -31,12 +31,12 @@ stored with NBT_ encoding format. NBT encoding is widely used in Minecraft.
    W = con.load("entry.nbt")
 
    # Add some meaningful information :)
-   W["author"] = "Me, myself and I"
-   W["date"] = "2014-02-26"
+   W[u"author"] = "Me, myself and I"
+   W[u"date"] = "2014-02-26"
 
    # By default, ints are of kind TAG_LONG. Nobody likes show-offs
-   W["nb_of_followers"] = 42
-   W.set_kind("nb_of_followers") = con.TAG_BYTE
+   W[u"nb_of_followers"] = 42
+   W.set_kind(u"nb_of_followers", con.TAG_BYTE)
 
    # Save it back
    W.save("entry.nbt")
@@ -47,7 +47,4 @@ Known limitations of using PyCraft with a Python 2.7 interpreter
 The current section lists the packages of PyCraft that won't work if you use a
 Python 2.7 interpreter:
 
-* ``con.py`` considers TAG_STRING items to be stored as str() object, whereas
-  in Python 2.7 it should be as unicode() object. As this last type has been
-  removed, there is no way to use the ``con.py`` package properly if you deal
-  with TAG_STRING items.
+* Not a single one.

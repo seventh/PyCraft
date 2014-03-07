@@ -46,7 +46,7 @@ class ReadWrite(unittest.TestCase):
         """Ensures that reading and writing back of any stored data is
         innocuous
         """
-        for _kind, _value in all_values(False):
+        for _kind, _value in all_values(True):
             # First, write reference file
             expected = io.BytesIO()
             con.save(expected, _kind, "", _value)
@@ -68,6 +68,20 @@ class ReadWrite(unittest.TestCase):
         """
         for kind, value in all_values(True):
             pretty_string = con.pretty(value, kind)
+
+
+    def test_suit(self):
+        """Ensures that 'suit' works correctly
+        """
+        for kind, value in all_values(False):
+            suitable_value = con.suit(value)
+            self.assertTrue(self.are_equivalent(suitable_value, value))
+
+
+    def are_equivalent(self, nbt_value, value):
+        """Recursively check that both value are equivalent
+        """
+        return True
 
 
 
@@ -92,36 +106,38 @@ def all_scalars():
     yield (con.TAG_STRING, "ma boîte dans ton œil")
 
 
-def all_dicts(restricted = False):
+def all_dicts(nbt_format):
     """Utility method to iterate over all authorized dictionnary types
     """
-    yield (con.TAG_COMPOUND, con.Dict())
-    if not restricted:
+    if nbt_format:
+        yield (con.TAG_COMPOUND, con.Dict())
+    else:
         yield (con.TAG_COMPOUND, dict())
 
 
-def all_lists(restricted = False):
+def all_lists(nbt_format):
     """Utility method to iterate over all authorized list types
     """
-    yield (con.TAG_LIST, con.List())
-    if not restricted:
+    if nbt_format:
+        yield (con.TAG_LIST, con.List())
+    else:
         yield (con.TAG_LIST, list())
 
 
-def all_values(restricted = False):
+def all_values(nbt_format):
     """Utility method to cover all kinds of value compositions
     """
-    for kind, value in all_values_1st_level(restricted):
+    for kind, value in all_values_1st_level(nbt_format):
         yield (kind, value)
 
-    for kind, value in all_values_2nd_level(restricted):
+    for kind, value in all_values_2nd_level(nbt_format):
         yield (kind, value)
 
-    for kind, value in all_values_3rd_level(restricted):
+    for kind, value in all_values_3rd_level(nbt_format):
         yield (kind, value)
 
 
-def all_values_1st_level(restricted = False):
+def all_values_1st_level(nbt_format):
     """Utility method to produce all terminal kinds of value (i.e. scalar
     values)
     """
@@ -129,28 +145,28 @@ def all_values_1st_level(restricted = False):
         yield (kind, value)
 
 
-def all_values_2nd_level(restricted = False):
+def all_values_2nd_level(nbt_format):
     """Utility method to produce all possible non recursive containers
     """
-    for kind, value in all_dicts(restricted):
+    for kind, value in all_dicts(nbt_format):
         # Empty dict
         yield (kind, value)
 
         # Filled dict
-        for i_kind, i_value in all_values_1st_level(restricted):
-            name = str(i_kind)
+        for i_kind, i_value in all_values_1st_level(nbt_format):
+            name = con.str_type(i_kind)
             value[name] = i_value
-            if isinstance(value, con.Dict):
+            if nbt_format:
                 value.set_kind(name, i_kind)
         yield (kind, value)
 
-    for kind, value in all_lists(restricted):
+    for kind, value in all_lists(nbt_format):
         # Empty list with no kind
         yield (kind, value)
 
-        for i_kind, i_value in all_values_1st_level(restricted):
+        for i_kind, i_value in all_values_1st_level(nbt_format):
             # Empty list with set kind
-            if isinstance(value, con.List):
+            if nbt_format:
                 value.set_kind(i_kind)
                 yield (kind, value)
 
@@ -160,24 +176,24 @@ def all_values_2nd_level(restricted = False):
             del value[:]
 
 
-def all_values_3rd_level(restricted = False):
+def all_values_3rd_level(nbt_format):
     """Utility method to produce all possible containers of containers
     """
     i = 0
 
-    for kind, value in all_dicts(restricted):
-        for i_kind, i_value in all_values_2nd_level(restricted):
-            name = str(i)
+    for kind, value in all_dicts(nbt_format):
+        for i_kind, i_value in all_values_2nd_level(nbt_format):
+            name = con.str_type(i)
             i += 1
             value[name] = i_value
-            if isinstance(value, con.Dict):
+            if nbt_format:
                 value.set_kind(name, i_kind)
         yield (kind, value)
 
-    for kind, value in all_lists(restricted):
-        for i_kind, i_value in all_values_2nd_level(restricted):
+    for kind, value in all_lists(nbt_format):
+        for i_kind, i_value in all_values_2nd_level(nbt_format):
             # Empty list with set kind
-            if isinstance(value, con.List):
+            if nbt_format:
                 value.set_kind(i_kind)
                 yield (kind, value)
 

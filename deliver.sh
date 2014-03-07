@@ -82,7 +82,7 @@ if __name__ == "__main__":
             "License :: OSI Approved",
             "Natural Language :: English",
             "Operating System :: OS Independent",
-            "Programming Language :: Python :: 3",
+            "Programming Language :: Python",
             "Topic :: Games/Entertainment",
             ],
         keywords = ["Minecraft"],
@@ -93,10 +93,10 @@ sed -i -e 's,<VERSION>,'${TAG}',' setup.py
 
 ln README.rst README
 
-python3 setup.py sdist --format=bztar || fail "invalid configuration"
+python3 setup.py sdist --format=bztar upload || fail "invalid configuration"
 git add dist/PyCraft-${TAG}.tar.bz2
 git commit -q -m "${COMMIT_MSG}"
 git tag ${TAG}
 
-rm MANIFEST README
+rm MANIFEST README setup.py
 echo "done."
