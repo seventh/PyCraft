@@ -34,7 +34,7 @@ class ReadWrite(unittest.TestCase):
         """
         for kind, expected_value in all_values(True):
             buffer = io.BytesIO()
-            con.save(buffer, kind, "", expected_value)
+            con.Writer.save(buffer, kind, "", expected_value)
 
             buffer.seek(0)
             value = con.load(buffer)
@@ -49,7 +49,7 @@ class ReadWrite(unittest.TestCase):
         for _kind, _value in all_values(True):
             # First, write reference file
             expected = io.BytesIO()
-            con.save(expected, _kind, "", _value)
+            con.Writer.save(expected, _kind, "", _value)
             expected.seek(0)
 
             # Then, load and save it immediately

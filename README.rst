@@ -39,12 +39,16 @@ stored with NBT_ encoding format. NBT encoding is widely used in Minecraft.
    W.set_kind(u"nb_of_followers", con.TAG_BYTE)
 
    # Save it back
-   W.save("entry.nbt")
+   con.save("entry.nbt", W)
+
+Nota: The Python 2 ``u""`` notation for unicode litteral constants, which had
+been removed by first releases of Python 3, had been added back by Python 3.3,
+in order to ease portability between the two Python flavours.
 
 Known limitations of using PyCraft with a Python 2.7 interpreter
 ----------------------------------------------------------------
 
-The current section lists the packages of PyCraft that won't work if you use a
-Python 2.7 interpreter:
+The current section lists the packages of PyCraft that are known to be
+incompatible of a Python 2.7 interpretation:
 
 * Not a single one.

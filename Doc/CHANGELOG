@@ -1,3 +1,11 @@
+2014-03-07  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
+
+	* con.py added support for slices, and now compatible with Python2
+
+2014-02-02  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
+
+	* con.py container-oriented NBT file format editors
+
 2013-05-24  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
 	* low.py multiple successive reads or writes are now allowed

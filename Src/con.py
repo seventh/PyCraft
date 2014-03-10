@@ -317,7 +317,7 @@ class Writer(object):
         """Record (name, value) pair, considering value's kind, into a file
         identified by given path
         """
-        flow = gzip.open(entry, "wb")
+        flow = gzip.open(path, "wb")
         Writer.save(flow, kind, name, value)
         flow.close()
 
@@ -518,10 +518,6 @@ class Container(object):
         raise NotImplementedError
 
 
-    def save(self, flow):
-        raise NotImplementedError
-
-
 
 class Dict(Container, collections.MutableMapping):
     """Statically typed associative container indexed by string identifiers
@@ -626,10 +622,6 @@ class Dict(Container, collections.MutableMapping):
         result += "{: >{fill}}}}".format("", fill = 2 * level)
 
         return result
-
-
-    def save(self, flow):
-        Writer.save(flow, TAG_COMPOUND, "", self)
 
 
 
@@ -755,17 +747,13 @@ class List(Container, collections.MutableSequence):
         return result
 
 
-    def save(self, flow):
-        Writer.save(flow, TAG_LIST, "", self)
-
-
 
 def load(entry):
     """Read NBT value from entry, being it a pathname identifying a file or a
     binary flow.
 
-    See Reader.load and Reader.load_file in order to also access name and
-    kind of the read value.
+    See Reader.load and Reader.load_file in order to also access name and kind
+    of the read value.
     """
     content = None
 
@@ -777,16 +765,20 @@ def load(entry):
     return content[2]
 
 
-def save(entry, kind, name, value):
-    """Record (name, value) pair, considering value's kind, into entry, being
-    it a file or a binary flow.
+def save(entry, value):
+    """Record anonymous value into entry, being it a file or a binary flow.
+    Kind of entry is automatically determined.
 
-    See also Writer.save and Write.save_file methods.
+    See Writer.save and Writer.save_file in order to also precise name and
+    kind of the written value.
     """
+    name = ""
+    kind = Oracle.default_kind(value)
+
     if isinstance(entry, str_type):
         Writer.save_file(entry, kind, name, value)
     else:
-        Writer.save(entry, kind, name, value)
+        Writer.save(entry, kind, bame, value)
 
 
 suit = Oracle.suit
