@@ -4,6 +4,5 @@
 build
 setup.py
 MANIFEST
-README
 # unittest artefacts
 Test/*.out

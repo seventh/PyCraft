@@ -43,7 +43,7 @@ COMMIT_MSG="RELEASE ${TAG}"
 
 echo "Releasing version ${TAG} ... "
 
-cat > setup.py <<EOF
+sed -e 's,<VERSION>,'${TAG}',' > setup.py <<EOF
 #-*- coding: utf-8 -*-
 """Setup script for distributing PyCraft
 
@@ -89,14 +89,11 @@ if __name__ == "__main__":
 
         )
 EOF
-sed -i -e 's,<VERSION>,'${TAG}',' setup.py
-
-ln README.rst README
 
 python3 setup.py sdist --format=bztar upload || fail "invalid configuration"
 git add dist/PyCraft-${TAG}.tar.bz2
 git commit -q -m "${COMMIT_MSG}"
 git tag ${TAG}
 
-rm MANIFEST README setup.py
+rm MANIFEST
 echo "done."
