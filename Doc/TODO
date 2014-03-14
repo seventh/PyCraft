@@ -1,0 +1,4 @@
+* packages: con, nbt
+  use enum.Enum facility introduced by Python 3.4 to manage the different NBT
+  tags, when backported to Python 2.7.
+  See https://stackoverflow.com/a/1695250/2312677 for further information
