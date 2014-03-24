@@ -38,15 +38,8 @@ in sectors of 4 Kib. Its description can be found here:
 
   http://www.minecraftwiki.net/wiki/Region_file_format
 
-This package hides the inner complexity of the container, which can either be
-accessed with a 10-bit long index, or a (z, x) pair where z and x are 5-bit
-long pseudo-coordinates. For your information, the conversion between the two
-kinds of keys is made according to the following relation:
-
-                             index = 32 * z + x
-
-The values of the dictionary are "Chunks", i.e. a structure representing the
-terrain and the entities of a single 16 x 256 x 16 area. They are here
+The values of the container are "Chunks", i.e. a structure representing the
+terrain and the entities of a single x=16 * y=256 * z=16 area. They are here
 provided as con.Dict objects.
 """
 
@@ -59,6 +52,7 @@ import zlib
 
 from . import low
 from . import con
+
 
 # Number of octets in a so-called "sector"
 _SECTOR_SIZE = 4096
@@ -94,7 +88,7 @@ class _ChunkMetaData(object):
     def location(self):
         """4-bytes integer, mixing offset and size
         """
-        result = (self._offset << 8) | self.nb_of_sectors
+        result = (self._offset << 8) | self._length
 
         return result
 
@@ -137,7 +131,7 @@ class _ChunkMetaData(object):
 
     @length.setter
     def length(self, length):
-        assert 0 <= size < 2 ** 8
+        assert 0 <= length < 2 ** 8
 
         self._length = length
 
@@ -158,14 +152,38 @@ class _ChunkMetaData(object):
 
 
 class Region(object):
-    """Region file wrapper
+    """Low-level Region file wrapper.
+
+    A Region is always edited in read/write mode. Modified loaded chunks shall
+    be explicitely saved for modifications to be actually taken into account.
     """
 
-    def __init__(self, path):
-        self._path = path
+    @staticmethod
+    def open(flow):
+        result = Region(flow)
+
+        return result
+
+
+    @staticmethod
+    def open_file(path):
+        flow = None
+        try:
+            flow = io.open(path, "rb+")
+        except IOError:
+            flow = io.open(path, "wb+")
+
+        result = Region.open(flow)
+        result._path = path
+
+        return result
+
+
+    def __init__(self, flow):
+        self._path = None
 
         # Open file and determine its current size.
-        self._flow = open(self._path, "rb+")
+        self._flow = flow
         self._flow.seek(0, 2)
         self._nb_sectors = self._flow.tell() // _SECTOR_SIZE
         self._free_sectors = set(range(2, self._nb_sectors))
@@ -191,28 +209,19 @@ class Region(object):
 
 
     def __del__(self):
-        self._flow.close()
+        if self._path is not None:
+            self._flow.close()
 
-        # Search for any referenced chunk
-        for meta in self._toc:
-            if meta.length != 0:
-                break
-        else:
-            logging.info("Removal of file {}".format(repr(self._path)))
-            os.unlink(self._path)
-
-
-    def load_chunk(self, rz, rx):
-        """Chunk at corresponding position, or None if it does not exist
-        """
-        assert 0 <= rz < 32
-        assert 0 <= rx < 32
-
-        index = 32 * rz + rx
-        return self.load_chunk_by_index(index)
+            # Search for any referenced chunk
+            for meta in self._toc:
+                if meta.length != 0:
+                    break
+            else:
+                logging.info("Removal of file {}".format(repr(self._path)))
+                os.unlink(self._path)
 
 
-    def load_chunk_by_index(self, index):
+    def load_chunk(self, index):
         """Chunk at corresponding index, or None if it does not exist
         """
         assert 0 <= index < 1024
@@ -221,7 +230,7 @@ class Region(object):
 
         meta = self._toc[index]
         if meta.length != 0:
-            self._flow.seek(meta.offset * _SECTOR_SIZE, 0)
+            self._flow.seek(meta.position, 0)
             size = low.read_int(self._flow)
             compression_type = low.read_byte(self._flow)
             if compression_type == 1:
@@ -233,17 +242,7 @@ class Region(object):
         return result
 
 
-    def save_chunk(self, rz, rx, value):
-        """Update chunk at corresponding index
-        """
-        assert 0 <= rz < 32
-        assert 0 <= rx < 32
-
-        index = 32 * rz + rx
-        return self.save_chunk_by_index(index, value)
-
-
-    def save_chunk_by_index(self, index, value):
+    def save_chunk(self, index, value):
         """Update chunk at corresponding index
         """
         assert 0 <= index < 1024
@@ -251,8 +250,7 @@ class Region(object):
         meta = self._toc[index]
 
         # First, free previous chunk if any
-        for freed_sector in range(meta.offset, meta.offset + meta_length):
-            self._free_sectors.add(freed_sector)
+        self._free_used_sectors(meta)
 
         # Encode data
         uncompressed_flow = io.BytesIO()
@@ -261,7 +259,7 @@ class Region(object):
         compressed_flow = zlib.compress(uncompressed_flow.getvalue())
 
         # Search for enough space
-        total_length = len(compress) + 5
+        total_length = len(compressed_flow) + 5
         nb_of_needed_sectors = (total_length + _SECTOR_SIZE - 1) // _SECTOR_SIZE
 
         first = None
@@ -275,76 +273,62 @@ class Region(object):
             if first is not None:
                 break
 
-        # Value can be stored in already allocated, unused sectors
-        if first is not None:
-            meta.offset = first
-            meta.length = nb_of_needed_sectors
-            meta.timestamp = int(time.time())
+        # Update metadata
+        meta.length = nb_of_needed_sectors
+        meta.timestamp = int(time.time())
 
-            for used_sector in range(first, first + nb_of_needed_sectors):
-                self._free_sectors.pop(used_sector)
-
-            # Update TOC
-            self._flow.seek(first * 4, 0)
-            low.write_int(self._flow, meta.location)
-            self._flow.seek(_SECTOR_SIZE + 4 * first)
-            low.write_int(self._flow, meta.timestamp)
-
-            # Write data
-            self._flow.seek(first * _SECTOR_SIZE, 0)
-            low.write_int(self._flow, total_length - 4)
-            low.write_byte(2)
-            self._flow.write(compressed_flow)
-
-        # File needs to be expanded
-        else:
+        if first is None:
             meta.offset = self._nb_sectors
-            meta.length = nb_of_needed_sectors
-            meta.timestamp = int(time.time())
-
             self._nb_sectors += nb_of_needed_sectors
+        else:
+            meta.offset = first
+            for used_sector in range(meta.offset, meta.offset + meta.length):
+                self._free_sectors.remove(used_sector)
 
-            # Update TOC
-            self._flow.seek(first * 4, 0)
-            low.write_int(self._flow, meta.location)
-            self._flow.seek(_SECTOR_SIZE + 4 * first)
-            low.write_int(self._flow, meta.timestamp)
+        # Update TOC
+        self._write_meta(index, meta)
 
-            # Write data
-            self._flow.seek(first * _SECTOR_SIZE, 0)
-            low.write_int(self._flow, total_length - 4)
-            low.write_byte(2)
-            self._flow.write(compressed_flow)
+        # Write data
+        self._flow.seek(meta.position, 0)
+        low.write_int(self._flow, total_length - 4)
+        low.write_byte(self._flow, 2)
+        self._flow.write(compressed_flow)
+
+        # Add some null bytes in case of newly allocated sectors
+        if first is None:
             self._flow.write(b"\x00" * ((-total_length) % _SECTOR_SIZE))
 
 
-    def kill_chunk(self, rz, rx):
-        """Remove chunk at corresponding index
-        """
-        assert 0 <= rz < 32
-        assert 0 <= rx < 32
-
-        index = 32 * rz + rx
-        return self.save_chunk_by_index(index, value)
-
-
-    def kill_chunk_by_index(self, index):
+    def wipe_chunk(self, index):
         """Remove chunk at corresponding index
         """
         assert 0 <= index < 1024
 
         meta = self._toc[index]
         if meta.length != 0:
-            for freed_sector in range(meta.offset, meta.offset + meta.length):
-                self._free_sectors.add(freed_sector)
+            self._free_used_sectors(meta)
             meta.length = 0
             meta.timestamp = int(time.time())
 
-            self._flow.seek(index * 4, 0)
-            low.write_int(self._flow, meta.location)
+            self._write_meta(index, meta)
 
-            self._flow.seek(_SECTOR_SIZE + index * 4, 0)
-            low.write_int(self._flow, meta.timestamp)
+
+    def _free_used_sectors(self, meta):
+        """Add sectors identified by metadata to the set of free sectors
+        """
+        for freed_sector in range(meta.offset, meta.offset + meta.length):
+            self._free_sectors.add(freed_sector)
+
+
+    def _write_meta(self, index, meta):
+        """Write MetaData for chunk at corresponding index
+        """
+        assert 0 <= index < _NB_OF_ENTRIES
+
+        self._flow.seek(4 * index, 0)
+        low.write_int(self._flow, meta.location)
+        self._flow.seek(_SECTOR_SIZE + 4 * index, 0)
+        low.write_int(self._flow, meta.timestamp)
 
 
     @property
@@ -358,7 +342,7 @@ class Region(object):
         """Iterate over stored chunks
         """
         for index in self.indexes():
-            yield self.load_chunk_by_index(index)
+            yield self.load_chunk(index)
 
 
     def __len__(self):
@@ -371,3 +355,18 @@ class Region(object):
         for index in range(_NB_OF_ENTRIES):
             if self._toc[index].length != 0:
                 yield index
+
+
+
+def open(entry):
+    """Wrap entry content into a Region object. entry can either be a pathname
+    or a binary flow.
+    """
+    result = None
+
+    if isinstance(entry, str):
+        result = Region.open_file(entry)
+    else:
+        result = Region.open(entry)
+
+    return result

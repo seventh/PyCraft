@@ -778,7 +778,7 @@ def save(entry, value):
     if isinstance(entry, str_type):
         Writer.save_file(entry, kind, name, value)
     else:
-        Writer.save(entry, kind, bame, value)
+        Writer.save(entry, kind, name, value)
 
 
 suit = Oracle.suit
