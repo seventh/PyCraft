@@ -98,6 +98,20 @@ class Triple(unittest.TestCase):
         self.assertEqual(2345, q.y)
         self.assertEqual(-16, q.z)
 
+    def test_calculate_anvil(self):
+        point = geometry.Triple(2.1, 23.2, 605.4)
+        self.assertEqual(0, point.rx)
+        self.assertEqual(1, point.rz)
+
+    def test_calculate_chunk(self):
+        point = geometry.Triple(2.1, 23.2, 605.4)
+        self.assertEqual(0, point.cx)
+        self.assertEqual(5, point.cz)
+
+    def test_calculate_section(self):
+        point = geometry.Triple(2.1, 23.2, 605.4)
+        self.assertEqual(1, point.sy)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -35,11 +35,15 @@
 """
 
 from functools import total_ordering
+from math import floor
 
 
 @total_ordering
 class Triple(object):
-    """Can either be a 3-D space coordinate, speed, and so on
+    """Can either be a 3-D space coordinate, speed, and so on.
+
+    Only 'x', 'y' and 'z' attributes can be set, the other ones being
+    calculted from them on.
     """
 
     __slots__ = ('_x', '_y', '_z')
@@ -150,3 +154,45 @@ class Triple(object):
     @z.setter
     def z(self, z):
         self._z = z
+
+
+    @property
+    def rz(self):
+        """Anvil file first identifier
+        """
+        return int(floor(self._z)) >> 9
+
+
+    @property
+    def rx(self):
+        """Anvil file second identifier
+        """
+        return int(floor(self._x)) >> 9
+
+
+    @property
+    def ci(self):
+        """Chunk index
+        """
+        return self.cz * 32 + self.cx
+
+
+    @property
+    def cx(self):
+        """Chunk second identifier
+        """
+        return (int(floor(self._x)) >> 4) % 32
+
+
+    @property
+    def cz(self):
+        """Chunk first identifier
+        """
+        return (int(floor(self._z)) >> 4) % 32
+
+
+    @property
+    def sy(self):
+        """Section identifier
+        """
+        return int(floor(self._y)) >> 4
