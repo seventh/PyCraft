@@ -6,3 +6,5 @@ setup.py
 MANIFEST
 # unittest artefacts
 Test/*.out
+# minecraft artefacts
+*.mca

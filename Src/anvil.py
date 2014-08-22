@@ -31,16 +31,14 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL-C license and that you accept its terms.
 
-"""Minecraft Region file format
+"""Minecraft Anvil file format
 
-A Region file is mainly an indexed container of NBT encoded data, structured
-in sectors of 4 Kib. Its description can be found here:
+An Anvil file is mainly a sparsed, indexed container of NBT encoded data,
+structured in sectors of 4 Kib. Its description can be found here:
 
-  http://www.minecraftwiki.net/wiki/Region_file_format
+  http://minecraft.gamepedia.com/Anvil_file_format
 
-The values of the container are "Chunks", i.e. a structure representing the
-terrain and the entities of a single x=16 * y=256 * z=16 area. They are here
-provided as con.Dict objects.
+Each value of the container is called a "Chunk"
 """
 
 import gzip
@@ -51,19 +49,18 @@ import time
 import zlib
 
 from . import low
-from . import con
+from . import nbt
 
 
 # Number of octets in a so-called "sector"
 _SECTOR_SIZE = 4096
 
-# Number of 4-octets integers in a single sector
+# Number of 4-octet integers in a single sector
 _NB_OF_ENTRIES = _SECTOR_SIZE // 4
 
 
-class _ChunkMetaData(object):
-    """Information concerning a single chunk stored in the index table of the
-    region file.
+class Metadata(object):
+    """Information concerning a single entry of an Anvil file.
     """
 
     __slots__ = ('_offset', '_length', '_timestamp')
@@ -86,7 +83,7 @@ class _ChunkMetaData(object):
 
     @property
     def location(self):
-        """4-bytes integer, mixing offset and size
+        """4-byte integer, mixing offset and size
         """
         result = (self._offset << 8) | self._length
 
@@ -103,14 +100,14 @@ class _ChunkMetaData(object):
 
     @property
     def position(self):
-        """Offset, in bytes, from the start of the Region file
+        """Offset, in bytes, from the start of the Anvil file
         """
         return self._offset << 12
 
 
     @property
     def offset(self):
-        """Offset, in number of sectors, from the start of the Region file
+        """Offset, in number of sectors, from the start of the Anvil file
         """
         return self._offset
 
@@ -151,29 +148,33 @@ class _ChunkMetaData(object):
 
 
 
-class Region(object):
-    """Low-level Region file wrapper.
+class Anvil(object):
+    """Low-level Anvil file wrapper.
 
-    A Region is always edited in read/write mode. Modified loaded chunks shall
-    be explicitely saved for modifications to be actually taken into account.
+    Modifications over an Anvil file have to be explictely saved to be
+    taken into account.
     """
 
     @staticmethod
     def open(flow):
-        result = Region(flow)
+        """Adapt an Anvil file format wrapper over a binary flow
+        """
+        result = Anvil(flow)
 
         return result
 
 
     @staticmethod
     def open_file(path):
+        """Adapt an Anvil file format wrapper over a file
+        """
         flow = None
         try:
             flow = io.open(path, "rb+")
         except IOError:
             flow = io.open(path, "wb+")
 
-        result = Region.open(flow)
+        result = Anvil.open(flow)
         result._path = path
 
         return result
@@ -194,7 +195,7 @@ class Region(object):
             self._nb_sectors = 2
             self._flow.write(b"\x00" * (self._nb_sectors * _SECTOR_SIZE))
             for i in range(_NB_OF_ENTRIES):
-                self._toc.append(_ChunkMetaData(0, 0))
+                self._toc.append(Metadata(0, 0))
 
         # Otherwise, read table of contents
         else:
@@ -202,7 +203,7 @@ class Region(object):
             locations = low.read_int(self._flow, _NB_OF_ENTRIES)
             timestamps = low.read_int(self._flow, _NB_OF_ENTRIES)
             for i in range(_NB_OF_ENTRIES):
-                meta = _ChunkMetaData(locations[i], timestamps[i])
+                meta = Metadata(locations[i], timestamps[i])
                 self._toc.append(meta)
                 for used_sector in range(meta.offset, meta.offset + meta.length):
                     self._free_sectors.remove(used_sector)
@@ -237,7 +238,7 @@ class Region(object):
                 uncompressed_flow = gzip.GzipFile(file_obj = self._flow)
             elif compression_type == 2:
                 uncompressed_flow = io.BytesIO(zlib.decompress(self._flow.read(size - 1)))
-            result = con.load(uncompressed_flow)
+            result = nbt.load(uncompressed_flow)
 
         return result
 
@@ -254,7 +255,7 @@ class Region(object):
 
         # Encode data
         uncompressed_flow = io.BytesIO()
-        con.save(uncompressed_flow, value)
+        nbt.save(uncompressed_flow, value)
         uncompressed_flow.seek(0, 0)
         compressed_flow = zlib.compress(uncompressed_flow.getvalue())
 
@@ -333,7 +334,7 @@ class Region(object):
 
     @property
     def path(self):
-        """Pathname of the currently edited Region file
+        """Pathname of the currently edited Anvil file
         """
         return self._path
 
@@ -359,14 +360,14 @@ class Region(object):
 
 
 def open(entry):
-    """Wrap entry content into a Region object. entry can either be a pathname
+    """Wrap entry content into a Anvil object. entry can either be a pathname
     or a binary flow.
     """
     result = None
 
     if isinstance(entry, str):
-        result = Region.open_file(entry)
+        result = Anvil.open_file(entry)
     else:
-        result = Region.open(entry)
+        result = Anvil.open(entry)
 
     return result

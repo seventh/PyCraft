@@ -7,15 +7,15 @@ import io
 import os
 import unittest
 
-from pycraft import region
+from pycraft import anvil
 
 
 class ReadWrite(unittest.TestCase):
 
     def test_metadata(self):
-        """Verify ChunkMetaData helper class correct behaviour
+        """Verify Metadata helper class correct behaviour
         """
-        meta = region._ChunkMetaData(2**32 - 1, 2**32 - 1)
+        meta = anvil.Metadata(2**32 - 1, 2**32 - 1)
 
         for offset in range(2, 18):
             for length in range(16):
@@ -33,8 +33,8 @@ class ReadWrite(unittest.TestCase):
         """Check that reading and writing back an original NBT file is
         innocuous
         """
-        r_input = region.open("region.mca")
-        r_output = region.open(io.BytesIO())
+        r_input = self.create_temporary_file("anvil.mca")
+        r_output = anvil.open(io.BytesIO())
 
         for index in r_input.indexes():
             chunk = r_input.load_chunk(index)
@@ -55,10 +55,10 @@ class ReadWrite(unittest.TestCase):
         value = 1234567890
 
         # First, create file
-        r_output = region.open(path)
+        r_output = anvil.open(path)
         indexes = set()
 
-        for index in range(0, region._NB_OF_ENTRIES, 3):
+        for index in range(0, anvil._NB_OF_ENTRIES, 3):
             r_output.save_chunk(index, value % (index + 2))
             indexes.add(index)
 
@@ -67,7 +67,7 @@ class ReadWrite(unittest.TestCase):
         del r_output
 
         # Then, read it back and check its content
-        r_input = region.open(path)
+        r_input = anvil.open(path)
 
         self.assertEqual(indexes, set(r_input.indexes()))
 
@@ -82,26 +82,34 @@ class ReadWrite(unittest.TestCase):
         """Totally wiped files shall be removed
         """
         path = "output_wipe.mca"
-        value = 1234567890
 
         # First, create file
-        r_output = region.open(path)
-
-        for index in range(0, region._NB_OF_ENTRIES, 3):
-            r_output.save_chunk(index, value % (index + 2))
-
-        del r_output
+        self.create_temporary_file(path)
+        os.stat(path)
 
         # Then, reload file
-        r_output = region.open(path)
+        r_output = anvil.open(path)
 
         for index in r_output.indexes():
             r_output.wipe_chunk(index)
 
         del r_output
 
+        # File shall have disappeared
         with self.assertRaises(OSError):
             os.stat(path)
+
+
+    def create_temporary_file(self, path):
+        result = anvil.open(path)
+
+        value = 1234567890
+
+        for index in range(0, anvil._NB_OF_ENTRIES, 3):
+            result.save_chunk(index, value % (index + 2))
+
+        return result
+
 
 
 if __name__ == "__main__":

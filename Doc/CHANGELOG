@@ -1,7 +1,13 @@
+2014-11-09  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
+
+	* anvil.py, region.py the former replaces the latter.
+	* con.py, nbt.py the latter has been removed, and the former renamed
+	to the latter.
+
 2014-11-07  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
-	* con.py, low.py, nbt.py TAG_BYTE goes unsigned
-	* geometry.py added standard arithmetic and comparision operators
+	* con.py, low.py, nbt.py TAG_BYTE goes unsigned.
+	* geometry.py added standard arithmetic and comparision operators.
 
 2014-03-23  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
@@ -9,17 +15,17 @@
 
 2014-03-07  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
-	* con.py added support for slices, and now compatible with Python2
+	* con.py added support for slices, and now compatible with Python2.
 
 2014-02-02  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
-	* con.py container-oriented NBT file format editors
+	* con.py container-oriented NBT file format editors.
 
 2013-05-24  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
-	* low.py multiple successive reads or writes are now allowed
-	* geometry.py add a named tuple to manage 3-D coordinates
+	* low.py multiple successive reads or writes are now allowed.
+	* geometry.py add a named tuple to manage 3-D coordinates.
 
 2013-04-09  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
-	* nbt.py NBT file format editors
+	* nbt.py NBT file format editors.

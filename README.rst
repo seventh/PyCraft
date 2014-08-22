@@ -21,14 +21,14 @@ Quick and dirty: edit a NBT-formatted file
 Here is an example of modifications that can be operated with PyCraft on a file
 stored with NBT_ encoding format. NBT encoding is widely used in Minecraft.
 
-.. _NBT: http://minecraft.gamepedia.com/NBT
+.. _NBT: http://minecraft.gamepedia.com/NBT_format
 
 ::
 
-   from pycraft import con
+   from pycraft import nbt
 
    # Load our favorite TAG_COMPOUND
-   W = con.load("entry.nbt")
+   W = nbt.load("entry.nbt")
 
    # Add some meaningful information :)
    W[u"author"] = "Me, myself and I"
@@ -39,7 +39,7 @@ stored with NBT_ encoding format. NBT encoding is widely used in Minecraft.
    W.set_kind(u"nb_of_followers", con.TAG_BYTE)
 
    # Save it back
-   con.save("entry.nbt", W)
+   nbt.save("entry.nbt", W)
 
 Nota: The Python 2 ``u""`` notation for unicode litteral constants, which had
 been removed by first releases of Python 3, had been added back by Python 3.3,

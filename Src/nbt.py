@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright or © or Copr. Guillaume Lemaître (2013)
+# Copyright or © or Copr. Guillaume Lemaître (2014)
 #
 #   guillaume.lemaitre@gmail.com
 #
@@ -31,658 +31,761 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL-C license and that you accept its terms.
 
-"""Named Binary Tag file format converter
+"""Container-Oriented NBT format
 
-Read and write Named Binary Tag file format (NBT) as specified in
-http://www.minecraftwiki.net/wiki/NBT
+Description of the NBT file format can be found here:
 
-A simple way to read a NBT file:
->>> flow = open("my_file.nbt", "rb")
->>> nbt_reader = nbt.Reader()
->>> content = nbt_reader.read(flow)
+  http://minecraft.gamepedia.com/NBT_format
 
-File format is separated from file content, so that it is not duplicated
-among various contents. But it still accessible for further use:
->>> template = nbt_reader.last_format
+Nevertheless, the description of the NBT format does not correspond to the
+way it is actually used in Minecraft. A TAG_COMPOUND is always the top-most
+level of any data hierarchy. Even a TAG_COMPOUND is always wrapped in a
+first level, anonymous TAG_COMPOUND! TAG names can disappear in TAG_LIST
+(and its derivatives), so they are not as mandatory as it seems. Finally,
+TAG_BYTE is very likely to be unsigned (the cases when it has to be signed
+are very few).
 
-Later, when edition is done, file can be updated easily:
->>> nbt_writer = nbt.Writer()
->>> flow = nbt_writer.write(content, template)
+So, this package provides a realistic usage of NBT format, by using python
+standard types for scalar values (int, float or str), and providing with
+two specific containers to mimic constraints of TAG_LIST and TAG_COMPOUND.
 
-This package has no known dependency with any Python 2 or 3 oddities
+TAG_BYTE_ARRAY and TAG_INT_ARRAY are considered to be storage optimizations,
+which constraints are difficult enough to manage to authorize their usage
+only by package implementation, and not by package user.
 """
 
-from collections import OrderedDict as odict
+# - Type of the elements is known from the container only
+# - If no precision is given, the largest one is provided
+
+import collections
 import gzip
-import logging
-import os.path
-import re
+import sys
 
 from . import low
 
+if sys.version_info < (3,):
+    str_type = unicode
+else:
+    str_type = str
 
-class Reader(object):
-    """Analyzes a NBT-encoded file, and separates its content from its format.
 
-    >>> reader = nbt.Reader()
-    >>> flow = open("level.dat", "rb")
-    >>> data = reader.read(flow)
-    >>> fmt = reader.last_format
+_TAG_NONE = 0
+TAG_BYTE = 1
+TAG_SHORT = 2
+TAG_INT = 3
+TAG_LONG = 4
+TAG_FLOAT = 5
+TAG_DOUBLE = 6
+_TAG_BYTE_ARRAY = 7
+TAG_STRING = 8
+TAG_LIST = 9
+TAG_COMPOUND = 10
+_TAG_INT_ARRAY = 11
+
+_VALID_TAGS = (
+    TAG_BYTE,
+    TAG_SHORT,
+    TAG_INT,
+    TAG_LONG,
+    TAG_FLOAT,
+    TAG_DOUBLE,
+    TAG_STRING,
+    TAG_LIST,
+    TAG_COMPOUND
+    );
+
+
+def is_accepted(kind, value):
+    """Does the value corresponds to the specificities of the kind?
+    """
+    result = False
+
+    if kind == TAG_BYTE:
+        result = isinstance(value, int) \
+            and 0 <= value < 256
+
+    elif kind == TAG_SHORT:
+        result = isinstance(value, int) \
+            and -32768 <= value < 32768
+
+    elif kind == TAG_INT:
+        result = isinstance(value, int) \
+            and -2147483648 <= value < 2147483648
+
+    elif kind == TAG_LONG:
+        result = isinstance(value, int) \
+            and -9223372036854775808 <= value < 9223372036854775808
+
+    elif kind == TAG_FLOAT or kind == TAG_DOUBLE:
+        result = isinstance(value, float)
+
+    elif kind == TAG_STRING:
+        result = isinstance(value, str_type)
+
+    elif kind == TAG_LIST:
+        result = isinstance(value, List)
+
+    elif kind == TAG_COMPOUND:
+        result = isinstance(value, Dict)
+
+    else:
+        raise ValueError("Unknown kind {}".format(kind))
+
+    return result
+
+
+TAG_NAME = {
+    TAG_BYTE : "TAG_Byte",
+    TAG_SHORT : "TAG_Short",
+    TAG_INT : "TAG_Int",
+    TAG_LONG : "TAG_Long",
+    TAG_FLOAT : "TAG_Float",
+    TAG_DOUBLE : "TAG_Double",
+    TAG_STRING : "TAG_String",
+    TAG_LIST : "TAG_List",
+    TAG_COMPOUND : "TAG_Compound",
+}
+
+
+def pretty(value, kind = None, name = None, level = 0):
+    def_kind, value = Oracle.suit(value)
+
+    if kind is None:
+        pretty(value, def_kind, name, level)
+
+    elif kind in [TAG_BYTE, TAG_SHORT, TAG_INT, TAG_LONG, TAG_FLOAT, TAG_DOUBLE]:
+        if name is None:
+            return "{: >{fill}}{}: {}".format("", TAG_NAME[kind], value, fill = level * 2)
+        else:
+            return "{: >{fill}}{}({}): {}".format("", TAG_NAME[kind], repr(name), value, fill = level * 2)
+
+    elif kind == TAG_STRING:
+        if name is None:
+            return "{: >{fill}}{}: {}".format("", TAG_NAME[kind], repr(value), fill = level * 2)
+        else:
+            return "{: >{fill}}{}({}): {}".format("", TAG_NAME[kind], repr(name), repr(value), fill = level * 2)
+
+    elif kind in (TAG_LIST, TAG_COMPOUND):
+        return value.pretty(name, level)
+
+    else:
+        raise ValueError
+
+
+class Oracle(object):
+    """Utility class to transform any data into a pycraft one.
+    The proposed transformation follows this schema:
+
+    isinstance(value, int)          --> result = (TAG_LONG, value)
+    isinstance(value, float)        --> result = (TAG_DOUBLE, value)
+    isinstance(value, str)          --> result = (TAG_STRING, value)
+    isinstance(value, (list, List)) --> result = (TAG_LIST, List(value))
+    isinstance(value, (dict, Dict)) --> result = (TAG_COMPOUND, Dict(value))
     """
 
-    # Internal variable to pass along the various readers
-    _flow = None
-
-    # Format detected during the last 'read' call
-    last_format = None
-
-
-    def read(self, entry):
-        """Parse a NBT encoded byte flow and construct a recursive dictionary
-        view of it
+    @staticmethod
+    def suit(value):
+        """Recursively create a pycraft compliant data from input value.
+        Result is a (kind, value) pair
         """
         result = None
 
-        if type(entry) == type(str()):
-            self._flow = gzip.open(entry, "rb")
-        else:
-            self._flow = entry
-        self.last_format = Format()
+        if isinstance(value, (int, float, str_type)):
+            result = (Oracle.default_kind(value), value)
 
-        result = self._read_named_tag(self.last_format)
+        elif isinstance(value, (list, List)):
+            result = (TAG_LIST, List())
+            if isinstance(value, List):
+                result[1].set_kind(value.get_kind())
+            for elem in value:
+                result[1].append(Oracle.suit(elem)[1])
 
-        if type(entry) == type(str()):
-            self._flow.close()
+        elif isinstance(value, (dict, Dict)):
+            result = (TAG_COMPOUND, Dict())
+            if isinstance(value, Dict):
+                for key in value:
+                    result[1].set_kind(key, value.get_kind(key))
+                    result[1][key] = Oracle.suit(value[key])[1]
+            else:
+                for key in value:
+                    result[1][key] = Oracle.suit(value[key])[1]
 
         return result
 
 
-    def _read_named_tag(self, fmt):
-        """A named tag is composed as this:
-        - byte tagType
-        - TAG_String name
-        - [payload]
+    @staticmethod
+    def test(value):
+        """Recursively verify that value complies to both its explicit
+        constraints and implicit constraints induced by the NBT format
+        """
+        result = True
 
-        Result is a (name, value) pair
+        if isinstance(value, (int, float, str_type)):
+            result = is_accepted(Oracle.default_kind(value), value)
+
+        elif isinstance(value, list):
+            kind = None
+            for elem in value:
+                if kind is None:
+                    kind = Oracle.default_kind(elem)
+                    if not Oracle.test(elem):
+                        result = False
+                        break
+                elif kind != Oracle.default_kind(elem) or not Oracle.test(elem):
+                    result = False
+                    break
+
+        elif isinstance(value, dict):
+            for elem in value.items():
+                if not is_accepted(Oracle.default_kind(elem), elem) \
+                        or not Oracle.test(elem):
+                    result = False
+                    break
+
+        return result
+
+
+    @staticmethod
+    def default_value(kind):
+        """Default value for any instance of the corresponding kind
         """
         result = None
 
-        tag = self._read_byte()
-        if tag != 0:
-            name = self._read_string()
+        if kind in (TAG_BYTE, TAG_SHORT, TAG_INT, TAG_LONG):
+            result = int()
 
-            reader = self._get_reader(tag)
-            value = reader(fmt)
+        elif kind in (TAG_FLOAT, TAG_DOUBLE):
+            result = float()
 
-            result = {name: value}
+        elif kind == TAG_STRING:
+            result = str_type()
 
-            fmt.tag = tag
-            fmt.name = name
+        elif kind == TAG_LIST:
+            result = List()
 
-        return result
-
-
-    def _read_byte(self, fmt = None):
-        """A TAG_Byte(1) is a 1-byte long signed integer
-
-        Result is a Python int()
-        """
-        result = low.read_byte(self._flow)
+        elif kind == TAG_COMPOUND:
+            result = Dict()
 
         return result
 
 
-    def _read_short(self, fmt = None):
-        """A TAG_Short(2) is a 2-byte long signed integer
-
-        Result is a Python int()
-        """
-        result = low.read_short(self._flow)
-
-        return result
-
-
-    def _read_int(self, fmt = None):
-        """A TAG_Int(3) is a 4-byte long signed integer
-
-        Result is a Python int()
-        """
-        result = low.read_int(self._flow)
-
-        return result
-
-
-    def _read_long(self, fmt = None):
-        """A TAG_Long(4) is a 8-byte long signed integer
-
-        Result is a Python int()
-        """
-        result = low.read_long(self._flow)
-
-        return result
-
-
-    def _read_float(self, fmt = None):
-        """A TAG_Float(5) is a 32-bit long decimal value conforming to
-        IEEE 754
-
-        Result is a Python float()
-        """
-        result = low.read_float(self._flow)
-
-        return result
-
-
-    def _read_double(self, fmt = None):
-        """A TAG_Double(6) is a 64-bit long decimal value conforming to
-        IEEE 754
-
-        Result is a Python float()
-        """
-        result = low.read_double(self._flow)
-
-        return result
-
-
-    def _read_byte_array(self, fmt):
-        """A TAG_Byte_Array(7) is composed as this:
-        - TAG_Int length
-        - [length TAG_Byte]
-
-        Result is a Python list() of int()
+    @staticmethod
+    def default_kind(value):
+        """When no precision is given, the largest suitable kind is preferred
         """
         result = None
 
-        fmt.fields = Format()
-        fmt.fields.tag = 1
-
-        result = low.read_byte_array(self._flow)
-
-        return result
-
-
-    def _read_string(self, fmt = None):
-        """A TAG_String(8) is composed as this:
-        - TAG_Short length
-        - [length TAG_Byte] representing a UTF-8 coded value
-
-        Result is a Python str()
-        """
-        result = None
-
-        result = low.read_string(self._flow)
-
-        return result
-
-
-    def _read_list(self, fmt):
-        """A TAG_List(9) is composed as this:
-        - TAG_Byte tag
-        - TAG_Int length
-        - [length elements of tag kind]
-
-        Result is a Python list()
-        """
-        result = None
-
-        tag = self._read_byte()
-        length = self._read_int()
-
-        # All inner elements share the same type. So, a single Format field is
-        # enough to store their common format
-        fmt.fields = Format()
-        fmt.fields.tag = tag
-
-        reader = self._get_reader(tag)
-        result = []
-        for i in range(length):
-            value = reader(fmt.fields)
-            result.append(value)
-
-        return result
-
-
-    def _read_compound(self, fmt):
-        """A TAG_Compound(10) is a set of (name, value) pairs
-
-        Result is a Python dict()
-        """
-        result = dict()
-
-        # All inner elements have a specific type.
-        fmt.fields = list()
-
-        while True:
-            inner_fmt = Format()
-            elem = self._read_named_tag(inner_fmt)
-            if elem is None:
-                break
-            result.update(elem)
-            fmt.fields.append(inner_fmt)
-
-        return result
-
-
-    def _read_int_array(self, fmt):
-        """A TAG_Int_Array(11) is composed as this:
-        - TAG_Int length
-        - [length TAG_Int]
-
-        Result is a Python list() of int()
-        """
-        result = None
-
-        fmt.fields = Format()
-        fmt.fields.tag = 3
-
-        result = low.read_int_array(self._flow)
-
-        return result
-
-
-    def _get_reader(self, tag):
-        """Provide parsing function associated to tag's value.
-
-        Parsing function has the following signature:
-
-          parsing_function(fmt)
-
-        where fmt is a Format() object
-        """
-        result = None
-
-        if tag == 1:
-            result = self._read_byte
-        elif tag == 2:
-            result = self._read_short
-        elif tag == 3:
-            result = self._read_int
-        elif tag == 4:
-            result = self._read_long
-        elif tag == 5:
-            result = self._read_float
-        elif tag == 6:
-            result = self._read_double
-        elif tag == 7:
-            result = self._read_byte_array
-        elif tag == 8:
-            result = self._read_string
-        elif tag == 9:
-            result = self._read_list
-        elif tag == 10:
-            result = self._read_compound
-        elif tag == 11:
-            result = self._read_int_array
-        else:
-            raise RuntimeError("unknown tag")
+        if isinstance(value, int):
+            result = TAG_LONG
+        elif isinstance(value, float):
+            result = TAG_DOUBLE
+        elif isinstance(value, str_type):
+            result = TAG_STRING
+        elif isinstance(value, (list, List)):
+            result = TAG_LIST
+        elif isinstance(value, (dict, Dict)):
+            result = TAG_COMPOUND
 
         return result
 
 
 
 class Writer(object):
-    """Convert a data hierarchy to a byte flow according to a specified format
+    """Utility class to record any int/float/str/[lL]ist/[dD]ict into NBT
+    format
+
+    Code snippet of typical usage:
+    >>> buffer = io.BytesIO()
+    >>> Writer.save(buffer, TAG_SHORT, "i", -15)
+    >>> Writer.save(buffer, TAG_LIST, "keys", ["a", "b"])
     """
 
-    _flow = None
-
-
-    def write(self, output, value, fmt):
-        """Parse a non-encoded byte flow and construct a recursive dictionary
-        view of it
+    @staticmethod
+    def save(flow, kind, name, value):
+        """Record (name, value) pair, considering value's kind, into binary
+        flow
         """
-        if type(output) == type(str()):
-            self._flow = gzip.open(output, "wb")
-        else:
-            self._flow = output
+        # Refine kind for a list
+        if kind == TAG_LIST:
+            if value.get_kind() == TAG_BYTE:
+                kind = _TAG_BYTE_ARRAY
+            elif value.get_kind() == TAG_INT:
+                kind = _TAG_INT_ARRAY
 
-        self._write_named_tag(value, fmt)
+        # Write kind, then name, then value
+        low.write_byte(flow, kind)
+        low.write_string(flow, name)
+        Writer.writers[kind](flow, value)
 
-        if type(output) == type(str()):
-            self._flow.close()
 
-
-    def _write_named_tag(self, value, fmt):
-        """A named tag is composed as this:
-        - byte tagType
-        - TAG_String name
-        - [payload]
+    @staticmethod
+    def save_file(path, kind, name, value):
+        """Record (name, value) pair, considering value's kind, into a file
+        identified by given path
         """
-        self._write_byte(fmt.tag)
-        self._write_string(fmt.name)
-
-        writer = self._get_writer(fmt.tag)
-        writer(value[fmt.name], fmt.fields)
+        flow = gzip.open(path, "wb")
+        Writer.save(flow, kind, name, value)
+        flow.close()
 
 
-    def _write_byte(self, value, fmt = None):
-        """A TAG_Byte(1) is a 1-byte long signed integer
+    @staticmethod
+    def _save_dict(flow, value):
+        for key in value:
+            Writer.save(flow, value.get_kind(key), key, value[key])
+        low.write_byte(flow, _TAG_NONE)
+
+
+    @staticmethod
+    def _save_list(flow, value):
+        # Refine elements kind in case of an empty list or a list of lists
+        inner_kind = value.get_kind()
+        if inner_kind is None:
+            inner_kind = _TAG_NONE
+        elif inner_kind == TAG_LIST:
+            at_least_one = False
+            byte_only = True
+            int_only = True
+            for inner_v in value:
+                inner_inner_kind = inner_v.get_kind()
+                if inner_inner_kind is not None:
+                    at_least_one = True
+                    if inner_inner_kind == TAG_BYTE:
+                        int_only = False
+                    elif inner_inner_kind == TAG_INT:
+                        byte_only = False
+                    else:
+                        byte_only = False
+                        int_only = False
+
+                if not (byte_only or int_only):
+                    break
+
+            # In case of deuce (all inner lists are empty), always consider
+            # inner lists to be byte arrays
+            if at_least_one:
+                if byte_only:
+                    inner_kind = _TAG_BYTE_ARRAY
+                elif int_only:
+                    inner_kind = _TAG_INT_ARRAY
+
+        # Write elements kind, then elements count, then elements values
+        low.write_byte(flow, inner_kind)
+        low.write_int(flow, len(value))
+        writer = Writer.writers[inner_kind]
+        for inner_v in value:
+            writer(flow, inner_v)
+
+
+    writers = [
+        None,
+        low.write_byte,
+        low.write_short,
+        low.write_int,
+        low.write_long,
+        low.write_float,
+        low.write_double,
+        low.write_byte_array,
+        low.write_string,
+        _save_list.__func__,
+        _save_dict.__func__,
+        low.write_int_array,
+        ]
+
+
+
+class Reader(object):
+    """Utility class to load any binary flow in NBT format into memory
+    """
+
+    @staticmethod
+    def load(flow):
+        """Read (kind, name, value) triple from binary flow
         """
-        low.write_byte(self._flow, value)
+        result = None # (kind, name, value)
 
+        kind = low.read_byte(flow)
+        if kind != _TAG_NONE:
+            name = low.read_string(flow)
 
-    def _write_short(self, value, fmt = None):
-        """A TAG_Short(2) is a 2-byte long signed integer
-        """
-        low.write_short(self._flow, value)
+            value = Reader.readers[kind](flow)
 
-
-    def _write_int(self, value, fmt = None):
-        """A TAG_Int(3) is a 4-byte long signed integer
-        """
-        low.write_int(self._flow, value)
-
-
-    def _write_long(self, value, fmt = None):
-        """A TAG_Long(4) is a 8-byte long signed integer
-        """
-        low.write_long(self._flow, value)
-
-
-    def _write_float(self, value, fmt = None):
-        """A TAG_Float(5) is a 32-bit long decimal value conforming to
-        IEEE 754
-        """
-        low.write_float(self._flow, value)
-
-
-    def _write_double(self, value, fmt = None):
-        """A TAG_Double(6) is a 64-bit long decimal value conforming to
-        IEEE 754
-        """
-        low.write_double(self._flow, value)
-
-
-    def _write_byte_array(self, value, fmt):
-        """A TAG_Byte_Array(7) is composed as this:
-        - TAG_Int length
-        - [length TAG_Byte]
-        """
-        low.write_byte_array(self._flow, value)
-
-
-    def _write_string(self, value, fmt = None):
-        """A TAG_String(8) is composed as this:
-        - TAG_Short length
-        - [length TAG_Byte] representing a UTF-8 coded value
-        """
-        low.write_string(self._flow, value)
-
-
-    def _write_list(self, value, fmt):
-        """A TAG_List(9) is composed as this:
-        - TAG_Byte tag
-        - TAG_Int length
-        - [length elements of tag kind]
-        """
-        length = len(value)
-
-        self._write_byte(fmt.tag)
-        self._write_int(length)
-
-        writer = self._get_writer(fmt.tag)
-        for element in value:
-            writer(element, fmt.fields)
-
-
-    def _write_compound(self, value, fmt):
-        """A TAG_Compound(10) is a set of (name, value) pairs
-        """
-        for item in fmt:
-            self._write_named_tag(value, item)
-        self._write_byte(0)
-
-
-    def _write_int_array(self, value, fmt):
-        """A TAG_Int_Array(11) is composed as this:
-        - TAG_Int length
-        - [length TAG_Int]
-        """
-        low.write_int_array(self._flow, value)
-
-
-    def _get_writer(self, tag):
-        """Provide parsing function associated to tag's value.
-
-        Parsing function has the following signature:
-
-          parsing_function(value, fmt)
-
-        where fmt is a Format() object
-        """
-        result = None
-
-        if tag == 1:
-            result = self._write_byte
-        elif tag == 2:
-            result = self._write_short
-        elif tag == 3:
-            result = self._write_int
-        elif tag == 4:
-            result = self._write_long
-        elif tag == 5:
-            result = self._write_float
-        elif tag == 6:
-            result = self._write_double
-        elif tag == 7:
-            result = self._write_byte_array
-        elif tag == 8:
-            result = self._write_string
-        elif tag == 9:
-            result = self._write_list
-        elif tag == 10:
-            result = self._write_compound
-        elif tag == 11:
-            result = self._write_int_array
-        else:
-            raise RuntimeError("unknown tag")
+            if kind in [_TAG_BYTE_ARRAY, _TAG_INT_ARRAY]:
+                kind = TAG_LIST
+            result = (kind, name, value)
 
         return result
 
 
+    @staticmethod
+    def load_file(path):
+        """Read (kind, name, value) triple from NBT-formatted file identified
+        by given path
+        """
+        result = None # (kind, name, value)
 
-###
-class Format(object):
-    """Format of a NBT-encoded file
-    """
-
-    # Tag of the element
-    tag = None
-
-    # Name of the element
-    name = None
-
-    # Format of inner elements. Useful only for list, array and compound.
-    fields = None
-
-    def __init__(self, tag = None):
-        self.tag = tag
-
-
-    def __str__(self):
-        result = self.to_string(0)
+        flow = gzip.open(path, "rb")
+        result = Reader.load(flow)
+        flow.close()
 
         return result
 
 
-    def pretty(self, data, indent = 0):
-        """Format out data
-        """
-        result = str()
-        prefix = "  " * indent
+    @staticmethod
+    def _load_dict(flow):
+        result = Dict()
 
-        result += prefix
-
-        result += self._get_element_type(self.tag)
-
-        if self.name is not None:
-            result += "({})".format(self._format_string(self.name))
-            data = data[self.name]
-
-        if self.tag == 9:
-            result += " of {}".format(self._get_element_type(self.fields.tag))
-
-        result += ": "
-
-        if self.tag == 8:
-            result += self._format_string(data)
-        elif self.tag == 9:
-            if self.fields.tag not in [8, 9, 10]:
-                result += str(data)
+        while True:
+            inner_v = Reader.load(flow)
+            if inner_v is None:
+                break
             else:
-                result += "[\n"
-                for i in range(len(data)):
-                    result += self.fields.pretty(data[i], indent + 1) + "\n"
-                result += prefix + "]"
-        elif self.tag == 10:
+                result.set_kind(inner_v[1], inner_v[0])
+                result[inner_v[1]] = inner_v[2]
+
+        return result
+
+
+    @staticmethod
+    def _load_list(flow):
+        result = List()
+
+        kind = low.read_byte(flow)
+        count = low.read_int(flow)
+
+        reader = Reader.readers[kind]
+
+        if kind == _TAG_NONE:
+            kind = None
+        elif kind in [_TAG_BYTE_ARRAY, _TAG_INT_ARRAY]:
+            kind = TAG_LIST
+        result.set_kind(kind)
+
+        for i in range(count):
+            result.append(reader(flow))
+
+        return result
+
+
+    @staticmethod
+    def _load_list_byte(flow):
+        """Method to load a TAG_BYTE_ARRAY
+        """
+        # Rely on knowledge of List implementation in order to gain
+        # performance
+        result = List()
+        result.set_kind(TAG_BYTE)
+        result._items = low.read_byte_array(flow)
+
+        return result
+
+
+    @staticmethod
+    def _load_list_int(flow):
+        """Method to load a TAG_INT_ARRAY
+        """
+        # Rely on knowledge of List implementation in order to gain
+        # performance
+        result = List()
+        result.set_kind(TAG_INT)
+        result._items = low.read_int_array(flow)
+
+        return result
+
+
+    readers = [
+        None,
+        low.read_byte,
+        low.read_short,
+        low.read_int,
+        low.read_long,
+        low.read_float,
+        low.read_double,
+        _load_list_byte.__func__,
+        low.read_string,
+        _load_list.__func__,
+        _load_dict.__func__,
+        _load_list_int.__func__,
+        ]
+
+
+
+_DictPair = collections.namedtuple('_DictPair', ['kind', 'item'])
+
+
+class Container(object):
+    """Abstract base class of containers
+    """
+
+    def __repr__(self):
+        return self.pretty()
+
+
+    def pretty(self, name = "", level = 0):
+        raise NotImplementedError
+
+
+
+class Dict(Container, collections.MutableMapping):
+    """Statically typed associative container indexed by string identifiers
+    >>> D = Dict()
+    >>> D.set_kind("abc", TAG_INT)
+    >>> D["abc"] = 5
+    >>> D["abc"] = 5.0
+    ValueError : wrong type
+    >>> D["def"] = 6
+    >>> print(D.get_kind("def") == TAG_LONG)
+    True
+    """
+
+    __slots__ = ('_pairs')
+
+
+    def __init__(self):
+        # object is implemented as an ordered dictionary associating strings
+        # with (K, V) pairs, K being a tag identifying the type of the value I
+        #
+        # usage of an ordered dictonary is for repeatability of results (for
+        # example, read a file and write it back)
+
+        self._pairs = collections.OrderedDict()
+
+
+    def __delitem__(self, key):
+        assert isinstance(key, str_type)
+
+        del self._pairs[key]
+
+
+    def __getitem__(self, key):
+        assert isinstance(key, str_type)
+
+        return self._pairs[key].item
+
+
+    def __setitem__(self, key, value):
+        assert isinstance(key, str_type)
+
+        if key in self:
+            kind = self._pairs[key].kind
+            if not is_accepted(kind, value):
+                raise ValueError
+        else:
+            kind = Oracle.default_kind(value)
+
+        self._pairs[key] = _DictPair(kind, value)
+
+
+    def __iter__(self):
+        return iter(self._pairs)
+
+
+    def __len__(self):
+        return len(self._pairs)
+
+
+    def get_kind(self, key):
+        """Get type of element identified by the corresponding key
+        """
+        assert isinstance(key, str_type)
+
+        result = self._pairs[key].kind
+
+        return result
+
+
+    def set_kind(self, key, kind):
+        """Set type of element identified by the corresponding key. If there
+        is currently no element pointed by the key, the value is set to the
+        default one. Otherwise, compatibility between the current value and
+        new kind is checked.
+        """
+        assert isinstance(key, str_type)
+
+        if kind not in _VALID_TAGS:
+            raise ValueError("Kind {} cannot be used as an actual type".format(kind))
+        elif key in self._pairs:
+            pair = self._pairs[key]
+            if not is_accepted(kind, pair.item):
+                raise KeyError
+            else:
+                self._pairs[key] = _DictPair(kind, pair.item)
+        else:
+            self._pairs[key] = _DictPair(kind, Oracle.default_value(kind))
+
+
+    def pretty(self, name = None, level = 0):
+        result = str_type("{: >{fill}}TAG_Compound".format("",
+                                                           fill = 2 * level))
+
+        if name is not None:
+            result += str_type("({})".format(repr(name)))
+        result += str_type(": {\n")
+
+        for key in self._pairs:
+            result += pretty(self._pairs[key].item, self._pairs[key].kind, key, level + 1)
+            result += "\n"
+
+        result += "{: >{fill}}}}".format("", fill = 2 * level)
+
+        return result
+
+
+
+class List(Container, collections.MutableSequence):
+    """Indexed set of elements that share the same kind
+    """
+
+    __slots__ = ('_kind', '_items')
+
+
+    def __init__(self, other = None):
+        self._kind = None
+        self._items = list()
+
+        if other is not None:
+            assert Oracle.test(other)
+            for value in other:
+                self.append(value)
+
+
+    def __delitem__(self, key):
+        del self._items[key]
+
+
+    def __getitem__(self, key):
+        if not isinstance(key, slice):
+            result = self._items[key]
+        else:
+            result = List()
+            result.set_kind(self.get_kind())
+            result[:] = self._items[key]
+
+        return result
+
+
+    def __setitem__(self, key, value):
+        if isinstance(key, slice):
+            if self._kind is None:
+                self._kind = Oracle.default_kind(value[0])
+
+            if self._kind is None:
+                raise KeyError
+            else:
+                for val in value:
+                    if not is_accepted(self._kind, val):
+                        raise ValueError
+                else:
+                    self._items[key] = value
+
+        else:
+            if self._kind is None:
+                self._kind = Oracle.default_kind(value)
+
+            if self._kind is None:
+                raise KeyError
+            elif not is_accepted(self._kind, value):
+                raise ValueError
+            else:
+                self._items[key] = value
+
+
+    def __len__(self):
+        return len(self._items)
+
+
+    def __eq__(self, other):
+        return self._kind == other._kind \
+            and self._items == other._items
+
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+    def insert(self, key, value):
+        if self._kind is None:
+            self._kind = Oracle.default_kind(value)
+
+        if self._kind is None:
+            raise KeyError
+        elif not is_accepted(self._kind, value):
+            raise ValueError
+        else:
+            self._items.insert(key, value)
+
+
+    def get_kind(self):
+        return self._kind
+
+
+    def set_kind(self, kind):
+        if len(self._items) == 0:
+            self._kind = kind
+        else:
+            for value in self._items:
+                if not is_accepted(kind, value):
+                    raise KeyError
+            else:
+                self._kind = kind
+
+
+    def pretty(self, name = None, level = 0):
+        result = str_type("{: >{fill}}TAG_List".format("", fill = 2 * level))
+
+        if name is not None:
+            result += str_type("({})".format(repr(name)))
+        if self._kind is not None:
+            result += str_type(" of {}".format(TAG_NAME[self._kind]))
+        result += str_type(": ")
+
+        if self._kind not in (TAG_LIST, TAG_COMPOUND):
+            result += "[" + ", ".join(map(str, self._items)) + "]\n"
+        else:
             result += "{\n"
-            for x in self.fields:
-                result += x.pretty(data, indent + 1) + "\n"
-            result += prefix + "}"
-        else:
-            result += str(data)
 
-        return result
+            for key in range(len(self._items)):
+                result += pretty(self._items[key], self._kind, key, level + 1)
+                result += "\n"
 
+            result += "{: >{fill}}}}".format("", fill = 2 * level)
 
-    def to_string(self, indent):
-        result = str()
-        prefix = "  " * indent
-
-        result += prefix
-
-        result += self._get_element_type(self.tag)
-
-        if self.name is not None:
-            result += "({})".format(self._format_string(self.name))
-
-        if self.tag == 9:
-            result += " of {}".format(self._get_element_type(self.fields.tag))
-            if self.fields.tag == 10:
-                result += self._format_compound(self.fields.fields, indent)
-        elif self.tag == 10:
-            result += self._format_compound(self.fields, indent)
-
-        return result
-
-
-    def _format_compound(self, fields, indent):
-        result = " {\n"
-
-        for field in fields:
-            result += "{}\n".format(field.to_string(indent + 1))
-        result += "{}}}".format("  " * indent)
-
-        return result
-
-
-    def _format_string(self, string):
-        result = "'" + re.sub("'", "\\'", string) + "'"
-
-        return result
-
-
-    def _get_element_type(self, tag):
-        result = None
-
-        if tag == 1:
-            result = "TAG_Byte"
-        elif tag == 2:
-            result = "TAG_Short"
-        elif tag == 3:
-            result = "TAG_Int"
-        elif tag == 4:
-            result = "TAG_Long"
-        elif tag == 5:
-            result = "TAG_Float"
-        elif tag == 6:
-            result = "TAG_Double"
-        elif tag == 7:
-            result = "TAG_Byte_Array"
-        elif tag == 8:
-            result = "TAG_String"
-        elif tag == 9:
-            result = "TAG_List"
-        elif tag == 10:
-            result = "TAG_Compound"
-        elif tag == 1:
-            result = "TAG_Int_Array"
-        else:
-            raise RuntimeError("unknown tag")
 
         return result
 
 
 
-def read(entry):
-    result = None
+def load(entry):
+    """Read NBT value from entry, being it a pathname identifying a file or a
+    binary flow.
 
-    r = Reader()
-    result = r.read(entry)
-
-    return result
-
-
-def write(output, data, template):
-    w = Writer()
-    w.write(output, data, template)
-
-
-def convert(nbt_element):
-    """Recursively transform an NBT element, so that all lists are converted
-    into ordered dictionaries. This eases the consumption of its fields.
+    See Reader.load and Reader.load_file in order to also access name and kind
+    of the read value.
     """
-    result = nbt_element
+    content = None
 
-    if isinstance(nbt_element, list):
-        result = odict()
-        for i in range(len(nbt_element)):
-            result[i] = convert(nbt_element[i])
-    elif isinstance(nbt_element, dict):
-        for key in nbt_element:
-            result[key] = convert(nbt_element[key])
+    if isinstance(entry, str_type):
+        content = Reader.load_file(entry)
+    else:
+        content = Reader.load(entry)
 
-    return result
+    return content[2]
 
 
-def consume(nbt_container, key, optional = None):
-    """Get access to a specific field and remove it from the NBT container.
-    This way, one can check that all fields are interpreted (and 'consume'
-    does). The container shall have previously been converted with the
-    'convert' method.
-    The 'optional' field is a string that, when set, indicates that the
-    required value is not mandatory. This string is used to prefix a specific
-    log message.
+def save(entry, value):
+    """Record anonymous value into entry, being it a file or a binary flow.
+    Kind of entry is automatically determined.
+
+    See Writer.save and Writer.save_file in order to also precise name and
+    kind of the written value.
     """
-    result = None
-    found = False
+    name = ""
+    kind = Oracle.default_kind(value)
 
-    try:
-        result = nbt_container[key]
-        found = True
-    except KeyError:
-        if optional is not None:
-            logging.info("Optional field not found: {}".format(os.path.join(optional, key)))
-        else:
-            raise
-
-    if isinstance(result, dict) \
-            and len(result) != 0:
-        logging.warning("{} attribute still holds {} field(s)".format(key, len(result)))
-
-    if found:
-        del nbt_container[key]
-
-    return result
+    if isinstance(entry, str_type):
+        Writer.save_file(entry, kind, name, value)
+    else:
+        Writer.save(entry, kind, name, value)
 
 
-def check(nbt_container, path = "/"):
-    """Search for any remaining item that would not have been consumed
-    """
-    for key in sorted(nbt_container):
-        value = nbt_container[key]
-        value_path = os.path.join(path, str(key))
-        if isinstance(value, dict):
-            check(value, value_path)
-        else:
-            logging.warning("Faulty remaining field: {}".format(value_path))
+suit = Oracle.suit
+test = Oracle.test
