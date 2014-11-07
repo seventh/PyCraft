@@ -34,6 +34,10 @@
 """Elements of 3-D geometry
 """
 
+from functools import total_ordering
+
+
+@total_ordering
 class Triple(object):
     """Can either be a 3-D space coordinate, speed, and so on
     """
@@ -46,7 +50,29 @@ class Triple(object):
         self._z = z
 
 
+    def __eq__(self, autre):
+        return self <= autre and autre <= self
+
+
+    def __le__(self, autre):
+        return self.x <= autre.x \
+            and self.y <= autre.y \
+            and self.z <= autre.z
+
+
+    def __ne__(self, autre):
+        return not (self == autre)
+
+
+    def __hash__(self):
+        return hash(str(self))
+
+
     def __iter__(self):
+        """For one to extract coordinates in a row:
+        >>> T = Triple(1, 2, 3)
+        >>> x, y, z = T
+        """
         yield self._x
         yield self._y
         yield self._z
@@ -55,6 +81,59 @@ class Triple(object):
     def __str__(self):
         result = '({}, {}, {})'.format(self._x, self._y, self._z)
         return result
+
+
+    def __iadd__(self, other):
+        self._x += other._x
+        self._y += other._y
+        self._z += other._z
+        return self
+
+
+    def __add__(self, other):
+        result = type(self)(self._x + other._x,
+                            self._y + other._y,
+                            self._z + other._z)
+        return result
+
+
+    def __isub__(self, other):
+        self._x -= other._x
+        self._y -= other._y
+        self._z -= other._z
+        return self
+
+
+    def __sub__(self, other):
+        result = type(self)(self._x - other._x,
+                            self._y - other._y,
+                            self._z - other._z)
+        return result
+
+
+    def __neg__(self):
+        result = type(self)(- self._x,
+                            - self._y,
+                            - self._z)
+        return result
+
+
+    def __imul__(self, scalar):
+        self._x *= scalar
+        self._y *= scalar
+        self._z *= scalar
+        return self
+
+
+    def __mul__(self, scalar):
+        result = type(self)(self._x * scalar,
+                            self._y * scalar,
+                            self._z * scalar)
+        return result
+
+
+    def __rmul__(self, scalar):
+        return self.__mul__(scalar)
 
 
     @property

@@ -1,3 +1,7 @@
+2014-11-07  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
+
+	* geometry.py added standard arithmetic and comparision operators
+
 2014-03-23  Guillaume Lemaître  <guillaume.lemaitre@gmail.com>
 
 	* region.py first proposal of handling Region formatted files.
