@@ -96,7 +96,7 @@ def is_accepted(kind, value):
 
     if kind == TAG_BYTE:
         result = isinstance(value, int) \
-            and -128 <= value < 128
+            and 0 <= value < 256
 
     elif kind == TAG_SHORT:
         result = isinstance(value, int) \

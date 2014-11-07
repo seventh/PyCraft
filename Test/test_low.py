@@ -33,7 +33,7 @@ class LowTest(unittest.TestCase):
 
     def test_byte(self):
         scenario = [ScenarioStep(read_byte, write_byte, 30),
-                    ScenarioStep(read_byte, write_byte, (2, -120, 35))]
+                    ScenarioStep(read_byte, write_byte, (2, 120, 235))]
 
         self.run_scenario(scenario)
 
@@ -74,7 +74,7 @@ class LowTest(unittest.TestCase):
 
 
     def test_byte_array(self):
-        scenario = [ScenarioStep(read_byte_array, write_byte_array, [-128]),
+        scenario = [ScenarioStep(read_byte_array, write_byte_array, [255]),
                     ScenarioStep(read_byte_array, write_byte_array,
                                  [0, 42, 127])]
 

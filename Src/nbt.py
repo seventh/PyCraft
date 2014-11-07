@@ -52,7 +52,10 @@ Later, when edition is done, file can be updated easily:
 This package has no known dependency with any Python 2 or 3 oddities
 """
 
+from collections import OrderedDict as odict
 import gzip
+import logging
+import os.path
 import re
 
 from . import low
@@ -623,3 +626,63 @@ def read(entry):
 def write(output, data, template):
     w = Writer()
     w.write(output, data, template)
+
+
+def convert(nbt_element):
+    """Recursively transform an NBT element, so that all lists are converted
+    into ordered dictionaries. This eases the consumption of its fields.
+    """
+    result = nbt_element
+
+    if isinstance(nbt_element, list):
+        result = odict()
+        for i in range(len(nbt_element)):
+            result[i] = convert(nbt_element[i])
+    elif isinstance(nbt_element, dict):
+        for key in nbt_element:
+            result[key] = convert(nbt_element[key])
+
+    return result
+
+
+def consume(nbt_container, key, optional = None):
+    """Get access to a specific field and remove it from the NBT container.
+    This way, one can check that all fields are interpreted (and 'consume'
+    does). The container shall have previously been converted with the
+    'convert' method.
+    The 'optional' field is a string that, when set, indicates that the
+    required value is not mandatory. This string is used to prefix a specific
+    log message.
+    """
+    result = None
+    found = False
+
+    try:
+        result = nbt_container[key]
+        found = True
+    except KeyError:
+        if optional is not None:
+            logging.info("Optional field not found: {}".format(os.path.join(optional, key)))
+        else:
+            raise
+
+    if isinstance(result, dict) \
+            and len(result) != 0:
+        logging.warning("{} attribute still holds {} field(s)".format(key, len(result)))
+
+    if found:
+        del nbt_container[key]
+
+    return result
+
+
+def check(nbt_container, path = "/"):
+    """Search for any remaining item that would not have been consumed
+    """
+    for key in sorted(nbt_container):
+        value = nbt_container[key]
+        value_path = os.path.join(path, str(key))
+        if isinstance(value, dict):
+            check(value, value_path)
+        else:
+            logging.warning("Faulty remaining field: {}".format(value_path))

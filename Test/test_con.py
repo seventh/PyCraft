@@ -88,7 +88,7 @@ class ReadWrite(unittest.TestCase):
 def all_scalars():
     """Utility method to iterate over all authorized scalar types
     """
-    yield (con.TAG_BYTE, -2**7)
+    yield (con.TAG_BYTE, 2**8 - 1)
     yield (con.TAG_SHORT, -2**15)
     yield (con.TAG_INT, -2**31)
     yield (con.TAG_LONG, -2**63)

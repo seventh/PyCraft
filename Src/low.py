@@ -62,9 +62,9 @@ def read_struct(flow, fmt):
 
 
 def read_byte(flow, count = 1):
-    """Read some 8-bit long signed int() from flow
+    """Read some 8-bit long unsigned int() from flow
     """
-    result = read_struct(flow, ">{}b".format(count))
+    result = read_struct(flow, ">{}B".format(count))
     if count == 1:
         result = result[0]
 
@@ -169,13 +169,13 @@ def write_struct(flow, fmt, *values):
 
 
 def write_byte(flow, value):
-    """Write some 8-bit long signed int() to flow
+    """Write some 8-bit long unsigned int() to flow
     """
     try:
         count = len(value)
-        write_struct(flow, ">{}b".format(count), *value)
+        write_struct(flow, ">{}B".format(count), *value)
     except TypeError:
-        write_struct(flow, ">b", value)
+        write_struct(flow, ">B", value)
 
 
 def write_short(flow, value):
