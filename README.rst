@@ -1,3 +1,6 @@
+.. image:: https://travis-ci.org/seventh/PyCraft.svg?branch=master
+    :target: https://travis-ci.org/seventh/PyCraft
+
 PyCraft
 =======
 
