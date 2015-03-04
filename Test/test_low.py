@@ -82,9 +82,8 @@ class LowTest(unittest.TestCase):
 
 
     def test_string(self):
-        scenario = [ScenarioStep(read_string, write_string,
-                                 "carrément méchant, jamais à cœur"),
-                    ScenarioStep(read_string, write_string, "dans ton œil")]
+        scenario = [ScenarioStep(read_string, write_string, b"carr\xc3\xa9ment m\xc3\xa9chant, jamais \xc3\xa0 c\xc5\x93ur".decode("utf-8")),
+                    ScenarioStep(read_string, write_string, b"dans ton \xc5\x93il".decode("utf-8"))]
 
         self.run_scenario(scenario)
 

@@ -102,19 +102,19 @@ def is_accepted(kind, value):
 
     if kind == TAG_BYTE:
         result = isinstance(value, int) \
-            and 0 <= value < 256
+            and 0 <= value <= 255
 
     elif kind == TAG_SHORT:
         result = isinstance(value, int) \
-            and -32768 <= value < 32768
+            and -32768 <= value <= 32767
 
     elif kind == TAG_INT:
         result = isinstance(value, int) \
-            and -2147483648 <= value < 2147483648
+            and -2147483648 <= value <= 2147483647
 
     elif kind == TAG_LONG:
         result = isinstance(value, int) \
-            and -9223372036854775808 <= value < 9223372036854775808
+            and -9223372036854775808 <= value <= 9223372036854775807
 
     elif kind == TAG_FLOAT or kind == TAG_DOUBLE:
         result = isinstance(value, float)
@@ -739,7 +739,7 @@ class List(Container, collections.MutableSequence):
         result += str_type(": ")
 
         if self._kind not in (TAG_LIST, TAG_COMPOUND):
-            result += "[" + ", ".join(map(str, self._items)) + "]\n"
+            result += "[" + ", ".join(map(str_type, self._items)) + "]\n"
         else:
             result += "{\n"
 

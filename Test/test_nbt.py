@@ -60,7 +60,7 @@ class ReadWrite(unittest.TestCase):
             # Finally compare both binary versions
             expected.seek(0)
             produced.seek(0)
-            self.assertEqual(expected.read(), produced.read(), str(_value))
+            self.assertEqual(expected.read(), produced.read(), _value)
 
 
     def test_pretty(self):
@@ -91,7 +91,7 @@ def all_scalars():
     yield (nbt.TAG_BYTE, 2**8 - 1)
     yield (nbt.TAG_SHORT, -2**15)
     yield (nbt.TAG_INT, -2**31)
-    yield (nbt.TAG_LONG, -2**63)
+    yield (nbt.TAG_LONG, (-2)**63)
 
     # Current value for TAG_FLOAT actually has to be totally representable
     # within the expression range of a TAG_FLOAT. For example, 3.7 would not
@@ -103,7 +103,7 @@ def all_scalars():
     # long
     yield (nbt.TAG_DOUBLE, 3.7)
 
-    yield (nbt.TAG_STRING, "ma boîte dans ton œil")
+    yield (nbt.TAG_STRING, b"ma bo\xc3\xaete dans ton \xc5\x93il".decode("utf-8"))
 
 
 def all_dicts(nbt_format):
