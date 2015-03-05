@@ -43,6 +43,8 @@ COMMIT_MSG="RELEASE ${TAG}"
 
 echo "Releasing version ${TAG} ... "
 
+pandoc -f rst -t plain -o README README.rst
+
 sed -e 's,<VERSION>,'${TAG}',' > setup.py <<EOF
 #-*- coding: utf-8 -*-
 """Setup script for distributing PyCraft
@@ -73,7 +75,7 @@ if __name__ == "__main__":
                     "Doc/CHANGELOG",
                     "Doc/Licence_CeCILL-C_V1-en.txt",
                     "Doc/Licence_CeCILL-C_V1-fr.txt",
-                    "README.rst",
+                    "README",
                     ]),
             ],
         classifiers = [
@@ -95,5 +97,5 @@ git add dist/PyCraft-${TAG}.tar.bz2
 git commit -q -m "${COMMIT_MSG}"
 git tag ${TAG}
 
-rm MANIFEST
+rm MANIFEST README
 echo "done."

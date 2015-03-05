@@ -34,8 +34,8 @@ stored with NBT_ encoding format. NBT encoding is widely used in Minecraft.
    W = nbt.load("entry.nbt")
 
    # Add some meaningful information :)
-   W[u"author"] = "Me, myself and I"
-   W[u"date"] = "2014-02-26"
+   W[u"author"] = u"Me, myself and I"
+   W[u"date"] = u"2014-02-26"
 
    # By default, ints are of kind TAG_LONG. Nobody likes show-offs
    W[u"nb_of_followers"] = 42
@@ -46,7 +46,9 @@ stored with NBT_ encoding format. NBT encoding is widely used in Minecraft.
 
 Nota: The Python 2 ``u""`` notation for unicode litteral constants, which had
 been removed by first releases of Python 3, had been added back by Python 3.3,
-in order to ease portability between the two Python flavours.
+in order to ease portability between the two Python flavours. Actually, using
+this notation is mandatory only for Python 2 users, to distinguish unicode
+strings from byte buffers.
 
 Known limitations of using PyCraft with a Python 2.7 interpreter
 ----------------------------------------------------------------
