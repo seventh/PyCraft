@@ -15,11 +15,11 @@ class ReadWrite(unittest.TestCase):
     def test_metadata(self):
         """Verify Metadata helper class correct behaviour
         """
-        meta = anvil.Metadata(2**32 - 1, 2**32 - 1)
+        meta = anvil.Metadata(2 ** 32 - 1, 2 ** 32 - 1)
 
         for offset in range(2, 18):
             for length in range(16):
-                for timestamp in range(2**31, 2**31 + 16):
+                for timestamp in range(2 ** 31, 2 ** 31 + 16):
                     meta.offset = offset
                     meta.length = length
                     meta.timestamp = timestamp
@@ -27,7 +27,6 @@ class ReadWrite(unittest.TestCase):
                     self.assertEqual(offset, meta.offset)
                     self.assertEqual(length, meta.length)
                     self.assertEqual(timestamp, meta.timestamp)
-
 
     def test_rewrite_file(self):
         """Check that reading and writing back an original NBT file is
@@ -46,7 +45,6 @@ class ReadWrite(unittest.TestCase):
             i_chunk = r_input.load_chunk(index)
             o_chunk = r_output.load_chunk(index)
             self.assertEqual(i_chunk, o_chunk)
-
 
     def test_new_file(self):
         """Check that writing a completely new file is working
@@ -77,7 +75,6 @@ class ReadWrite(unittest.TestCase):
 
         os.unlink(path)
 
-
     def test_wipe_file(self):
         """Totally wiped files shall be removed
         """
@@ -99,7 +96,6 @@ class ReadWrite(unittest.TestCase):
         with self.assertRaises(OSError):
             os.stat(path)
 
-
     def create_temporary_file(self, path):
         result = anvil.open(path)
 
@@ -109,7 +105,6 @@ class ReadWrite(unittest.TestCase):
             result.save_chunk(index, value % (index + 2))
 
         return result
-
 
 
 if __name__ == "__main__":

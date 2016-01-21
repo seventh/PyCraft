@@ -92,7 +92,7 @@ _VALID_TAGS = (
     TAG_STRING,
     TAG_LIST,
     TAG_COMPOUND
-    );
+)
 
 
 def is_accepted(kind, value):
@@ -101,20 +101,17 @@ def is_accepted(kind, value):
     result = False
 
     if kind == TAG_BYTE:
-        result = isinstance(value, int) \
-            and 0 <= value <= 255
+        result = isinstance(value, int) and 0 <= value <= 255
 
     elif kind == TAG_SHORT:
-        result = isinstance(value, int) \
-            and -32768 <= value <= 32767
+        result = isinstance(value, int) and -32768 <= value <= 32767
 
     elif kind == TAG_INT:
-        result = isinstance(value, int) \
-            and -2147483648 <= value <= 2147483647
+        result = isinstance(value, int) and -2147483648 <= value <= 2147483647
 
     elif kind == TAG_LONG:
-        result = isinstance(value, int) \
-            and -9223372036854775808 <= value <= 9223372036854775807
+        result = (isinstance(value, int)
+                  and -9223372036854775808 <= value <= 9223372036854775807)
 
     elif kind == TAG_FLOAT or kind == TAG_DOUBLE:
         result = isinstance(value, float)
@@ -135,35 +132,40 @@ def is_accepted(kind, value):
 
 
 TAG_NAME = {
-    TAG_BYTE : "TAG_Byte",
-    TAG_SHORT : "TAG_Short",
-    TAG_INT : "TAG_Int",
-    TAG_LONG : "TAG_Long",
-    TAG_FLOAT : "TAG_Float",
-    TAG_DOUBLE : "TAG_Double",
-    TAG_STRING : "TAG_String",
-    TAG_LIST : "TAG_List",
-    TAG_COMPOUND : "TAG_Compound",
+    TAG_BYTE: "TAG_Byte",
+    TAG_SHORT: "TAG_Short",
+    TAG_INT: "TAG_Int",
+    TAG_LONG: "TAG_Long",
+    TAG_FLOAT: "TAG_Float",
+    TAG_DOUBLE: "TAG_Double",
+    TAG_STRING: "TAG_String",
+    TAG_LIST: "TAG_List",
+    TAG_COMPOUND: "TAG_Compound",
 }
 
 
-def pretty(value, kind = None, name = None, level = 0):
+def pretty(value, kind=None, name=None, level=0):
     def_kind, value = Oracle.suit(value)
 
     if kind is None:
         pretty(value, def_kind, name, level)
 
-    elif kind in [TAG_BYTE, TAG_SHORT, TAG_INT, TAG_LONG, TAG_FLOAT, TAG_DOUBLE]:
+    elif kind in [TAG_BYTE, TAG_SHORT, TAG_INT, TAG_LONG,
+                  TAG_FLOAT, TAG_DOUBLE]:
         if name is None:
-            return "{: >{fill}}{}: {}".format("", TAG_NAME[kind], value, fill = level * 2)
+            return "{: >{fill}}{}: {}".format(
+                "", TAG_NAME[kind], value, fill=level * 2)
         else:
-            return "{: >{fill}}{}({}): {}".format("", TAG_NAME[kind], repr(name), value, fill = level * 2)
+            return "{: >{fill}}{}({}): {}".format(
+                "", TAG_NAME[kind], repr(name), value, fill=level * 2)
 
     elif kind == TAG_STRING:
         if name is None:
-            return "{: >{fill}}{}: {}".format("", TAG_NAME[kind], repr(value), fill = level * 2)
+            return "{: >{fill}}{}: {}".format(
+                "", TAG_NAME[kind], repr(value), fill=level * 2)
         else:
-            return "{: >{fill}}{}({}): {}".format("", TAG_NAME[kind], repr(name), repr(value), fill = level * 2)
+            return "{: >{fill}}{}({}): {}".format(
+                "", TAG_NAME[kind], repr(name), repr(value), fill=level * 2)
 
     elif kind in (TAG_LIST, TAG_COMPOUND):
         return value.pretty(name, level)
@@ -212,7 +214,6 @@ class Oracle(object):
 
         return result
 
-
     @staticmethod
     def test(value):
         """Recursively verify that value complies to both its explicit
@@ -231,19 +232,19 @@ class Oracle(object):
                     if not Oracle.test(elem):
                         result = False
                         break
-                elif kind != Oracle.default_kind(elem) or not Oracle.test(elem):
+                elif (kind != Oracle.default_kind(elem)
+                      or not Oracle.test(elem)):
                     result = False
                     break
 
         elif isinstance(value, dict):
             for elem in value.items():
-                if not is_accepted(Oracle.default_kind(elem), elem) \
-                        or not Oracle.test(elem):
+                if (not is_accepted(Oracle.default_kind(elem), elem)
+                        or not Oracle.test(elem)):
                     result = False
                     break
 
         return result
-
 
     @staticmethod
     def default_value(kind):
@@ -268,7 +269,6 @@ class Oracle(object):
 
         return result
 
-
     @staticmethod
     def default_kind(value):
         """When no precision is given, the largest suitable kind is preferred
@@ -287,7 +287,6 @@ class Oracle(object):
             result = TAG_COMPOUND
 
         return result
-
 
 
 class Writer(object):
@@ -317,7 +316,6 @@ class Writer(object):
         low.write_string(flow, name)
         Writer.writers[kind](flow, value)
 
-
     @staticmethod
     def save_file(path, kind, name, value):
         """Record (name, value) pair, considering value's kind, into a file
@@ -327,13 +325,11 @@ class Writer(object):
         Writer.save(flow, kind, name, value)
         flow.close()
 
-
     @staticmethod
     def _save_dict(flow, value):
         for key in value:
             Writer.save(flow, value.get_kind(key), key, value[key])
         low.write_byte(flow, _TAG_NONE)
-
 
     @staticmethod
     def _save_list(flow, value):
@@ -375,7 +371,6 @@ class Writer(object):
         for inner_v in value:
             writer(flow, inner_v)
 
-
     writers = [
         None,
         low.write_byte,
@@ -389,8 +384,7 @@ class Writer(object):
         _save_list.__func__,
         _save_dict.__func__,
         low.write_int_array,
-        ]
-
+    ]
 
 
 class Reader(object):
@@ -401,7 +395,7 @@ class Reader(object):
     def load(flow):
         """Read (kind, name, value) triple from binary flow
         """
-        result = None # (kind, name, value)
+        result = None  # (kind, name, value)
 
         kind = low.read_byte(flow)
         if kind != _TAG_NONE:
@@ -415,20 +409,18 @@ class Reader(object):
 
         return result
 
-
     @staticmethod
     def load_file(path):
         """Read (kind, name, value) triple from NBT-formatted file identified
         by given path
         """
-        result = None # (kind, name, value)
+        result = None  # (kind, name, value)
 
         flow = gzip.open(path, "rb")
         result = Reader.load(flow)
         flow.close()
 
         return result
-
 
     @staticmethod
     def _load_dict(flow):
@@ -443,7 +435,6 @@ class Reader(object):
                 result[inner_v[1]] = inner_v[2]
 
         return result
-
 
     @staticmethod
     def _load_list(flow):
@@ -465,7 +456,6 @@ class Reader(object):
 
         return result
 
-
     @staticmethod
     def _load_list_byte(flow):
         """Method to load a TAG_BYTE_ARRAY
@@ -478,7 +468,6 @@ class Reader(object):
 
         return result
 
-
     @staticmethod
     def _load_list_int(flow):
         """Method to load a TAG_INT_ARRAY
@@ -490,7 +479,6 @@ class Reader(object):
         result._items = low.read_int_array(flow)
 
         return result
-
 
     readers = [
         None,
@@ -505,8 +493,7 @@ class Reader(object):
         _load_list.__func__,
         _load_dict.__func__,
         _load_list_int.__func__,
-        ]
-
+    ]
 
 
 _DictPair = collections.namedtuple('_DictPair', ['kind', 'item'])
@@ -519,10 +506,8 @@ class Container(object):
     def __repr__(self):
         return self.pretty()
 
-
-    def pretty(self, name = "", level = 0):
+    def pretty(self, name="", level=0):
         raise NotImplementedError
-
 
 
 class Dict(Container, collections.MutableMapping):
@@ -539,7 +524,6 @@ class Dict(Container, collections.MutableMapping):
 
     __slots__ = ('_pairs')
 
-
     def __init__(self):
         # object is implemented as an ordered dictionary associating strings
         # with (K, V) pairs, K being a tag identifying the type of the value I
@@ -549,18 +533,15 @@ class Dict(Container, collections.MutableMapping):
 
         self._pairs = collections.OrderedDict()
 
-
     def __delitem__(self, key):
         assert isinstance(key, str_type)
 
         del self._pairs[key]
 
-
     def __getitem__(self, key):
         assert isinstance(key, str_type)
 
         return self._pairs[key].item
-
 
     def __setitem__(self, key, value):
         assert isinstance(key, str_type)
@@ -574,14 +555,11 @@ class Dict(Container, collections.MutableMapping):
 
         self._pairs[key] = _DictPair(kind, value)
 
-
     def __iter__(self):
         return iter(self._pairs)
 
-
     def __len__(self):
         return len(self._pairs)
-
 
     def get_kind(self, key):
         """Get type of element identified by the corresponding key
@@ -592,7 +570,6 @@ class Dict(Container, collections.MutableMapping):
 
         return result
 
-
     def set_kind(self, key, kind):
         """Set type of element identified by the corresponding key. If there
         is currently no element pointed by the key, the value is set to the
@@ -602,7 +579,8 @@ class Dict(Container, collections.MutableMapping):
         assert isinstance(key, str_type)
 
         if kind not in _VALID_TAGS:
-            raise ValueError("Kind {} cannot be used as an actual type".format(kind))
+            raise ValueError(
+                "Kind {} cannot be used as an actual type".format(kind))
         elif key in self._pairs:
             pair = self._pairs[key]
             if not is_accepted(kind, pair.item):
@@ -612,23 +590,22 @@ class Dict(Container, collections.MutableMapping):
         else:
             self._pairs[key] = _DictPair(kind, Oracle.default_value(kind))
 
-
-    def pretty(self, name = None, level = 0):
+    def pretty(self, name=None, level=0):
         result = str_type("{: >{fill}}TAG_Compound".format("",
-                                                           fill = 2 * level))
+                                                           fill=2 * level))
 
         if name is not None:
             result += str_type("({})".format(repr(name)))
         result += str_type(": {\n")
 
         for key in self._pairs:
-            result += pretty(self._pairs[key].item, self._pairs[key].kind, key, level + 1)
+            result += pretty(self._pairs[key].item,
+                             self._pairs[key].kind, key, level + 1)
             result += "\n"
 
-        result += "{: >{fill}}}}".format("", fill = 2 * level)
+        result += "{: >{fill}}}}".format("", fill=2 * level)
 
         return result
-
 
 
 class List(Container, collections.MutableSequence):
@@ -637,8 +614,7 @@ class List(Container, collections.MutableSequence):
 
     __slots__ = ('_kind', '_items')
 
-
-    def __init__(self, other = None):
+    def __init__(self, other=None):
         self._kind = None
         self._items = list()
 
@@ -647,10 +623,8 @@ class List(Container, collections.MutableSequence):
             for value in other:
                 self.append(value)
 
-
     def __delitem__(self, key):
         del self._items[key]
-
 
     def __getitem__(self, key):
         if not isinstance(key, slice):
@@ -661,7 +635,6 @@ class List(Container, collections.MutableSequence):
             result[:] = self._items[key]
 
         return result
-
 
     def __setitem__(self, key, value):
         if isinstance(key, slice):
@@ -688,19 +661,15 @@ class List(Container, collections.MutableSequence):
             else:
                 self._items[key] = value
 
-
     def __len__(self):
         return len(self._items)
 
-
     def __eq__(self, other):
-        return self._kind == other._kind \
-            and self._items == other._items
-
+        return (self._kind == other._kind
+                and self._items == other._items)
 
     def __ne__(self, other):
         return not self.__eq__(other)
-
 
     def insert(self, key, value):
         if self._kind is None:
@@ -713,10 +682,8 @@ class List(Container, collections.MutableSequence):
         else:
             self._items.insert(key, value)
 
-
     def get_kind(self):
         return self._kind
-
 
     def set_kind(self, kind):
         if len(self._items) == 0:
@@ -728,9 +695,8 @@ class List(Container, collections.MutableSequence):
             else:
                 self._kind = kind
 
-
-    def pretty(self, name = None, level = 0):
-        result = str_type("{: >{fill}}TAG_List".format("", fill = 2 * level))
+    def pretty(self, name=None, level=0):
+        result = str_type("{: >{fill}}TAG_List".format("", fill=2 * level))
 
         if name is not None:
             result += str_type("({})".format(repr(name)))
@@ -747,11 +713,9 @@ class List(Container, collections.MutableSequence):
                 result += pretty(self._items[key], self._kind, key, level + 1)
                 result += "\n"
 
-            result += "{: >{fill}}}}".format("", fill = 2 * level)
-
+            result += "{: >{fill}}}}".format("", fill=2 * level)
 
         return result
-
 
 
 def load(entry):

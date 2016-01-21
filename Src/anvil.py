@@ -73,13 +73,11 @@ class Metadata(object):
         self.location = location
         self.timestamp = timestamp
 
-
     def __str__(self):
         result = "({}, {}, {})".format(self._offset,
                                        self._length,
                                        self._timestamp)
         return result
-
 
     @property
     def location(self):
@@ -89,7 +87,6 @@ class Metadata(object):
 
         return result
 
-
     @location.setter
     def location(self, location):
         assert 0 <= location < 2 ** 32
@@ -97,13 +94,11 @@ class Metadata(object):
         self._offset = (location & 0xFFFFFF00) >> 8
         self._length = location & 0xFF
 
-
     @property
     def position(self):
         """Offset, in bytes, from the start of the Anvil file
         """
         return self._offset << 12
-
 
     @property
     def offset(self):
@@ -111,13 +106,11 @@ class Metadata(object):
         """
         return self._offset
 
-
     @offset.setter
     def offset(self, offset):
         assert 2 <= offset < 2 ** 24
 
         self._offset = offset
-
 
     @property
     def length(self):
@@ -125,13 +118,11 @@ class Metadata(object):
         """
         return self._length
 
-
     @length.setter
     def length(self, length):
         assert 0 <= length < 2 ** 8
 
         self._length = length
-
 
     @property
     def timestamp(self):
@@ -139,13 +130,11 @@ class Metadata(object):
         """
         return self._timestamp
 
-
     @timestamp.setter
     def timestamp(self, timestamp):
         assert 0 <= timestamp < 2 ** 32
 
         self._timestamp = timestamp
-
 
 
 class Anvil(object):
@@ -163,7 +152,6 @@ class Anvil(object):
 
         return result
 
-
     @staticmethod
     def open_file(path):
         """Adapt an Anvil file format wrapper over a file
@@ -178,7 +166,6 @@ class Anvil(object):
         result._path = path
 
         return result
-
 
     def __init__(self, flow):
         self._path = None
@@ -205,9 +192,9 @@ class Anvil(object):
             for i in range(_NB_OF_ENTRIES):
                 meta = Metadata(locations[i], timestamps[i])
                 self._toc.append(meta)
-                for used_sector in range(meta.offset, meta.offset + meta.length):
+                for used_sector in range(meta.offset,
+                                         meta.offset + meta.length):
                     self._free_sectors.remove(used_sector)
-
 
     def __del__(self):
         if self._path is not None:
@@ -220,7 +207,6 @@ class Anvil(object):
             else:
                 logging.info("Removal of file {}".format(repr(self._path)))
                 os.unlink(self._path)
-
 
     def load_chunk(self, index):
         """Chunk at corresponding index, or None if it does not exist
@@ -235,13 +221,13 @@ class Anvil(object):
             size = low.read_int(self._flow)
             compression_type = low.read_byte(self._flow)
             if compression_type == 1:
-                uncompressed_flow = gzip.GzipFile(file_obj = self._flow)
+                uncompressed_flow = gzip.GzipFile(file_obj=self._flow)
             elif compression_type == 2:
-                uncompressed_flow = io.BytesIO(zlib.decompress(self._flow.read(size - 1)))
+                uncompressed_flow = io.BytesIO(
+                    zlib.decompress(self._flow.read(size - 1)))
             result = nbt.load(uncompressed_flow)
 
         return result
-
 
     def save_chunk(self, index, value):
         """Update chunk at corresponding index
@@ -261,7 +247,8 @@ class Anvil(object):
 
         # Search for enough space
         total_length = len(compressed_flow) + 5
-        nb_of_needed_sectors = (total_length + _SECTOR_SIZE - 1) // _SECTOR_SIZE
+        nb_of_needed_sectors = (
+            total_length + _SECTOR_SIZE - 1) // _SECTOR_SIZE
 
         first = None
         for i in self._free_sectors:
@@ -299,7 +286,6 @@ class Anvil(object):
         if first is None:
             self._flow.write(b"\x00" * ((-total_length) % _SECTOR_SIZE))
 
-
     def wipe_chunk(self, index):
         """Remove chunk at corresponding index
         """
@@ -313,13 +299,11 @@ class Anvil(object):
 
             self._write_meta(index, meta)
 
-
     def _free_used_sectors(self, meta):
         """Add sectors identified by metadata to the set of free sectors
         """
         for freed_sector in range(meta.offset, meta.offset + meta.length):
             self._free_sectors.add(freed_sector)
-
 
     def _write_meta(self, index, meta):
         """Write MetaData for chunk at corresponding index
@@ -331,13 +315,11 @@ class Anvil(object):
         self._flow.seek(_SECTOR_SIZE + 4 * index, 0)
         low.write_int(self._flow, meta.timestamp)
 
-
     @property
     def path(self):
         """Pathname of the currently edited Anvil file
         """
         return self._path
-
 
     def __iter__(self):
         """Iterate over stored chunks
@@ -345,10 +327,8 @@ class Anvil(object):
         for index in self.indexes():
             yield self.load_chunk(index)
 
-
     def __len__(self):
         return len(list(self.indexes()))
-
 
     def indexes(self):
         """Iterator over the indexes of stored chunks
@@ -356,7 +336,6 @@ class Anvil(object):
         for index in range(_NB_OF_ENTRIES):
             if self._toc[index].length != 0:
                 yield index
-
 
 
 def open(entry):

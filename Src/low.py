@@ -46,8 +46,7 @@ For simple types, both single values and containers can be used as args:
 import struct
 
 
-
-### Reading primitives
+# Reading primitives
 
 def read_struct(flow, fmt):
     """Interpret a binary I/O, given its format. Result is always a tuple()
@@ -61,7 +60,7 @@ def read_struct(flow, fmt):
     return result
 
 
-def read_byte(flow, count = 1):
+def read_byte(flow, count=1):
     """Read some 8-bit long unsigned int() from flow
     """
     result = read_struct(flow, ">{}B".format(count))
@@ -71,7 +70,7 @@ def read_byte(flow, count = 1):
     return result
 
 
-def read_short(flow, count = 1):
+def read_short(flow, count=1):
     """Read some big-endian 16-bit long signed int() from flow
     """
     result = read_struct(flow, ">{}h".format(count))
@@ -81,7 +80,7 @@ def read_short(flow, count = 1):
     return result
 
 
-def read_int(flow, count = 1):
+def read_int(flow, count=1):
     """Read some big-endian 32-bit long signed int() from flow
     """
     result = read_struct(flow, ">{}l".format(count))
@@ -91,7 +90,7 @@ def read_int(flow, count = 1):
     return result
 
 
-def read_long(flow, count = 1):
+def read_long(flow, count=1):
     """Read some big-endian 64-bit long signed int() from flow
     """
     result = read_struct(flow, ">{}q".format(count))
@@ -101,7 +100,7 @@ def read_long(flow, count = 1):
     return result
 
 
-def read_float(flow, count = 1):
+def read_float(flow, count=1):
     """Read some big-endian 32-bit long float() conforming to IEEE 754 from
     flow
     """
@@ -112,7 +111,7 @@ def read_float(flow, count = 1):
     return result
 
 
-def read_double(flow, count = 1):
+def read_double(flow, count=1):
     """Read some big-endian 64-bit long float() conforming to IEEE 754 from
     flow
     """
@@ -156,7 +155,7 @@ def read_int_array(flow):
     return result
 
 
-### Writing primitives
+# Writing primitives
 
 def write_struct(flow, fmt, *values):
     """Pack a C structure to the corresponding flow, given its format

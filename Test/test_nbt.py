@@ -27,7 +27,6 @@ class ReadWrite(unittest.TestCase):
                 produced = output_file.read()
                 self.assertEqual(expected, produced)
 
-
     def test_write_read(self):
         """Ensures that the reconstructed version of any stored data is
         identical to the original one
@@ -40,7 +39,6 @@ class ReadWrite(unittest.TestCase):
             value = nbt.load(buffer)
 
             self.assertEqual(expected_value, value, str(kind))
-
 
     def test_read_write(self):
         """Ensures that reading and writing back of any stored data is
@@ -62,13 +60,11 @@ class ReadWrite(unittest.TestCase):
             produced.seek(0)
             self.assertEqual(expected.read(), produced.read(), _value)
 
-
     def test_pretty(self):
         """Ensures that 'pretty' is always functional
         """
         for kind, value in all_values(True):
             pretty_string = nbt.pretty(value, kind)
-
 
     def test_suit(self):
         """Ensures that 'suit' works correctly
@@ -77,21 +73,19 @@ class ReadWrite(unittest.TestCase):
             suitable_value = nbt.suit(value)
             self.assertTrue(self.are_equivalent(suitable_value, value))
 
-
     def are_equivalent(self, nbt_value, value):
         """Recursively check that both value are equivalent
         """
         return True
 
 
-
 def all_scalars():
     """Utility method to iterate over all authorized scalar types
     """
-    yield (nbt.TAG_BYTE, 2**8 - 1)
-    yield (nbt.TAG_SHORT, -2**15)
-    yield (nbt.TAG_INT, -2**31)
-    yield (nbt.TAG_LONG, (-2)**63)
+    yield (nbt.TAG_BYTE, 2 ** 8 - 1)
+    yield (nbt.TAG_SHORT, -2 ** 15)
+    yield (nbt.TAG_INT, -2 ** 31)
+    yield (nbt.TAG_LONG, (-2) ** 63)
 
     # Current value for TAG_FLOAT actually has to be totally representable
     # within the expression range of a TAG_FLOAT. For example, 3.7 would not
@@ -103,7 +97,8 @@ def all_scalars():
     # long
     yield (nbt.TAG_DOUBLE, 3.7)
 
-    yield (nbt.TAG_STRING, b"ma bo\xc3\xaete dans ton \xc5\x93il".decode("utf-8"))
+    yield (nbt.TAG_STRING,
+           b"ma bo\xc3\xaete dans ton \xc5\x93il".decode("utf-8"))
 
 
 def all_dicts(nbt_format):

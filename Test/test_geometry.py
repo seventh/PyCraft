@@ -6,6 +6,7 @@
 import unittest
 from pycraft import geometry
 
+
 class Triple(unittest.TestCase):
 
     def test_str(self):
@@ -14,7 +15,6 @@ class Triple(unittest.TestCase):
 
         self.assertEqual(str(triple), str(point))
 
-
     def test_unpack(self):
         point = geometry.Triple(2, -7, 11)
         x, y, z = point
@@ -22,12 +22,10 @@ class Triple(unittest.TestCase):
         self.assertEqual(point.y, y)
         self.assertEqual(point.z, z)
 
-
     def test_update_x(self):
         point = geometry.Triple(2, -5, 11)
         point.x += 3
         self.assertEqual(5, point.x)
-
 
     def test_addition(self):
         p = geometry.Triple(1, 3, 2)
@@ -51,7 +49,6 @@ class Triple(unittest.TestCase):
         self.assertEqual(-3, p.y)
         self.assertEqual(-2, p.z)
 
-
     def test_difference(self):
         p = geometry.Triple(1, 3, 2)
         q = geometry.Triple(2, 6, 4)
@@ -74,7 +71,6 @@ class Triple(unittest.TestCase):
         self.assertEqual(-3, p.y)
         self.assertEqual(-2, p.z)
 
-
     def test_multiplication(self):
         p = geometry.Triple(12, -2345, 16)
         q = 3 * p
@@ -92,7 +88,6 @@ class Triple(unittest.TestCase):
         self.assertEqual(q.y, p.y)
         self.assertEqual(q.z, p.z)
 
-
     def test_negation(self):
         p = geometry.Triple(12, -2345, 16)
         q = -p
@@ -102,7 +97,6 @@ class Triple(unittest.TestCase):
         self.assertEqual(-12, q.x)
         self.assertEqual(2345, q.y)
         self.assertEqual(-16, q.z)
-
 
 
 if __name__ == "__main__":

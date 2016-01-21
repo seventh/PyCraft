@@ -49,24 +49,19 @@ class Triple(object):
         self._y = y
         self._z = z
 
-
     def __eq__(self, autre):
         return self <= autre and autre <= self
-
 
     def __le__(self, autre):
         return self.x <= autre.x \
             and self.y <= autre.y \
             and self.z <= autre.z
 
-
     def __ne__(self, autre):
         return not (self == autre)
 
-
     def __hash__(self):
         return hash(str(self))
-
 
     def __iter__(self):
         """For one to extract coordinates in a row:
@@ -77,11 +72,9 @@ class Triple(object):
         yield self._y
         yield self._z
 
-
     def __str__(self):
         result = '({}, {}, {})'.format(self._x, self._y, self._z)
         return result
-
 
     def __iadd__(self, other):
         self._x += other._x
@@ -89,13 +82,11 @@ class Triple(object):
         self._z += other._z
         return self
 
-
     def __add__(self, other):
         result = type(self)(self._x + other._x,
                             self._y + other._y,
                             self._z + other._z)
         return result
-
 
     def __isub__(self, other):
         self._x -= other._x
@@ -103,13 +94,11 @@ class Triple(object):
         self._z -= other._z
         return self
 
-
     def __sub__(self, other):
         result = type(self)(self._x - other._x,
                             self._y - other._y,
                             self._z - other._z)
         return result
-
 
     def __neg__(self):
         result = type(self)(- self._x,
@@ -117,13 +106,11 @@ class Triple(object):
                             - self._z)
         return result
 
-
     def __imul__(self, scalar):
         self._x *= scalar
         self._y *= scalar
         self._z *= scalar
         return self
-
 
     def __mul__(self, scalar):
         result = type(self)(self._x * scalar,
@@ -131,10 +118,8 @@ class Triple(object):
                             self._z * scalar)
         return result
 
-
     def __rmul__(self, scalar):
         return self.__mul__(scalar)
-
 
     @property
     def x(self):
@@ -142,11 +127,9 @@ class Triple(object):
         """
         return self._x
 
-
     @x.setter
     def x(self, x):
         self._x = x
-
 
     @property
     def y(self):
@@ -154,18 +137,15 @@ class Triple(object):
         """
         return self._y
 
-
     @y.setter
     def y(self, y):
         self._y = y
-
 
     @property
     def z(self):
         """First coordinate in plan, growing from North to South
         """
         return self._z
-
 
     @z.setter
     def z(self, z):
