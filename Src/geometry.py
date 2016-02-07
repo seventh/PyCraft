@@ -34,11 +34,11 @@
 """Elements of 3-D geometry
 """
 
-from functools import total_ordering
-from math import floor
+import functools
+import math
 
 
-@total_ordering
+@functools.total_ordering
 class Triple(object):
     """Can either be a 3-D space coordinate, speed, and so on.
 
@@ -53,13 +53,25 @@ class Triple(object):
         self._y = y
         self._z = z
 
+    @classmethod
+    def from_chunk(cls, cx, cz):
+        return cls(cx << 4, 0, cz << 4)
+
+    @classmethod
+    def from_index(cls, index):
+        return cls.from_chunk(index % 32, index // 32)
+
+    @classmethod
+    def from_region(cls, rx, rz):
+        return cls(rx << 9, 0, rz << 9)
+
     def __eq__(self, autre):
         return self <= autre and autre <= self
 
     def __le__(self, autre):
-        return self.x <= autre.x \
-            and self.y <= autre.y \
-            and self.z <= autre.z
+        return (self.x <= autre.x
+                and self.y <= autre.y
+                and self.z <= autre.z)
 
     def __ne__(self, autre):
         return not (self == autre)
@@ -105,9 +117,7 @@ class Triple(object):
         return result
 
     def __neg__(self):
-        result = type(self)(- self._x,
-                            - self._y,
-                            - self._z)
+        result = type(self)(- self._x, - self._y, - self._z)
         return result
 
     def __imul__(self, scalar):
@@ -155,20 +165,17 @@ class Triple(object):
     def z(self, z):
         self._z = z
 
-
     @property
     def rz(self):
         """Anvil file first identifier
         """
-        return int(floor(self._z)) >> 9
-
+        return int(math.floor(self._z)) >> 9
 
     @property
     def rx(self):
         """Anvil file second identifier
         """
-        return int(floor(self._x)) >> 9
-
+        return int(math.floor(self._x)) >> 9
 
     @property
     def ci(self):
@@ -176,23 +183,20 @@ class Triple(object):
         """
         return self.cz * 32 + self.cx
 
-
     @property
     def cx(self):
         """Chunk second identifier
         """
-        return (int(floor(self._x)) >> 4) % 32
-
+        return (int(math.floor(self._x)) >> 4) % 32
 
     @property
     def cz(self):
         """Chunk first identifier
         """
-        return (int(floor(self._z)) >> 4) % 32
-
+        return (int(math.floor(self._z)) >> 4) % 32
 
     @property
     def sy(self):
         """Section identifier
         """
-        return int(floor(self._y)) >> 4
+        return int(math.floor(self._y)) >> 4
